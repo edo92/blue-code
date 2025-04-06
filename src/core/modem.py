@@ -4,7 +4,7 @@ import os
 import re
 import time
 from cmd import Cmd
-from src.lib.logger import Logger
+from ..lib.logger import Logger
 
 
 class ModemController:

@@ -2,8 +2,8 @@
 
 import re
 import subprocess
-from src.core.mac import MacAddressGenerator
-from src.lib.logger import Logger
+from .mac import MacAddressGenerator
+from ..lib.logger import Logger
 
 
 class CommandExecutor:

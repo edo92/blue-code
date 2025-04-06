@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 
-from src.lib.logger import Logger
-from src.core.modem import ModemController
+
 import json
 import os
 import subprocess
-import sys
-from pathlib import Path
-
-# Add the src directory to the Python path
-src_path = str(Path(__file__).parent.parent.parent)
-if src_path not in sys.path:
-    sys.path.append(src_path)
+from ..lib.logger import Logger
+from .modem import ModemController
 
 
 class SIM:

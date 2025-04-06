@@ -3,9 +3,9 @@
 import argparse
 import sys
 
-from mac import MacRandomizer
-from net import CommandExecutor, NetworkConfigurator
-from logger import Logger
+from core.mac import MacRandomizer
+from core.net import CommandExecutor, NetworkConfigurator
+from lib.logger import Logger
 
 
 def parse_arguments():

@@ -2,7 +2,7 @@
 
 import os
 import random
-from net import NetworkConfigurator
+from .net import NetworkConfigurator
 
 
 class MacAddressGenerator:
