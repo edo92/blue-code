@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 import logging
 from enum import Enum
 
@@ -17,13 +16,28 @@ class Logger:
     _instance = None
 
     def __new__(cls, name='blue-code', log_file=None, level=logging.DEBUG):
+        # Convert enum to int if needed
+        if isinstance(level, LogLevel):
+            level = level.value
+
         if cls._instance is None:
             cls._instance = super(Logger, cls).__new__(cls)
-            cls._instance.logger = logging.getLogger(name)
-            cls._instance.logger.setLevel(level)
+            cls._instance.logger = None  # Initialize to None first
 
-            # Avoid adding handlers multiple times if the logger is already configured.
-            if not cls._instance.logger.handlers:
+        return cls._instance
+
+    def __init__(self, name='blue-code', log_file=None, level=logging.DEBUG):
+        # Convert enum to int if needed
+        if isinstance(level, LogLevel):
+            level = level.value
+
+        # Only initialize once
+        if self.logger is None:
+            self.logger = logging.getLogger(name)
+            self.logger.setLevel(level)
+
+            # Avoid adding handlers multiple times if the logger is already configured
+            if not self.logger.handlers:
                 # Console handler
                 console_handler = logging.StreamHandler()
                 console_handler.setLevel(level)
@@ -31,7 +45,7 @@ class Logger:
                     '%(levelname)s - %(message)s'
                 )
                 console_handler.setFormatter(console_formatter)
-                cls._instance.logger.addHandler(console_handler)
+                self.logger.addHandler(console_handler)
 
                 # File handler (only if log_file is provided)
                 if log_file:
@@ -41,6 +55,24 @@ class Logger:
                         '%(name)s - %(levelname)s - %(message)s'
                     )
                     file_handler.setFormatter(file_formatter)
-                    cls._instance.logger.addHandler(file_handler)
+                    self.logger.addHandler(file_handler)
 
-        return cls._instance
+    # Add these methods to make the class work correctly
+    def debug(self, message):
+        self.logger.debug(message)
+
+    def info(self, message):
+        self.logger.info(message)
+
+    def warning(self, message):
+        self.logger.warning(message)
+
+    def error(self, message):
+        self.logger.error(message)
+
+    def critical(self, message):
+        self.logger.critical(message)
+
+    # Add this as a compatibility method
+    def log(self, message):
+        self.logger.debug(message)
