@@ -121,6 +121,43 @@ class Cmd:
                 return err_msg, 1
             return self.run_serial_command(command)
 
+    def run_command(self, command):
+        """
+        Run a shell command.
+
+        Args:
+            command (str): The shell command to execute
+
+        Returns:
+            tuple: (output_string, exit_code) where exit_code is 0 for success
+        """
+        self.log(f"Running shell command: {command}")
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            output = result.stdout
+            if result.stderr:
+                output += "\n" + result.stderr
+
+            self.log(f"Command returned exit code {result.returncode}")
+            if self.verbose:
+                self.log(f"Command output:\n{output.strip()}")
+
+            return output, result.returncode
+
+        except Exception as e:
+            err_msg = f"Error executing command: {e}"
+            self.logger.error(err_msg)
+            return str(e), 1
+
     @staticmethod
     def is_gl_modem_available():
         """

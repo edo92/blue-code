@@ -3,9 +3,8 @@
 import argparse
 import sys
 
-from core.mac import MacRandomizer
-from core.net import CommandExecutor, NetworkConfigurator
-from lib.logger import LogLevel, Logger
+from core.bssid import BSSIDManager
+from core.net import  NetworkConfigurator
 
 
 def parse_arguments():
@@ -34,25 +33,7 @@ def parse_arguments():
 
 
 def main():
-    """Main entry point for the application."""
-    args = parse_arguments()
-
-    # Set up logger
-    logger = Logger("CLI", None, LogLevel.DEBUG)
-
-    # Display banner
-    logger.debug("=" * 60)
-    logger.debug("Blue Merle - MAC Address Randomizer")
-    logger.debug("=" * 60)
-
-    if args.dry_run:
-        logger.debug("DRY RUN MODE - No changes will be made")
-
-    # Set up executor
-    executor = CommandExecutor(logger)
-
-    # Create main randomizer
-    randomizer = MacRandomizer(logger, executor)
+    manager = BSSIDManager()
 
     # # Check if running as root
     # if not randomizer.check_running_as_root() and not args.dry_run:

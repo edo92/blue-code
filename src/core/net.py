@@ -3,7 +3,7 @@
 import re
 import subprocess
 from .mac_gen import MacAddressGenerator
-from src.lib.logger import Logger
+from ..lib.logger import Logger
 
 
 class CommandExecutor:
