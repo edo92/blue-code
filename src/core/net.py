@@ -2,7 +2,7 @@
 
 import re
 import subprocess
-from .mac_generator import MacAddressGenerator
+from .mac import MacAddressGenerator
 from src.lib.logger import Logger
 
 
