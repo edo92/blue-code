@@ -4,7 +4,7 @@ import random
 import argparse
 import sys
 from .cmd import Cmd
-from ..lib.logger import Logger
+from src.lib.logger import Logger
 
 
 class BSSIDManager:

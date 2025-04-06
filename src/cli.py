@@ -3,8 +3,8 @@
 import argparse
 import sys
 
-from core.bssid import BSSIDManager
-from core.net import  NetworkConfigurator
+from src.core.bssid import BSSIDManager
+from src.core.net import  NetworkConfigurator
 
 
 def parse_arguments():
