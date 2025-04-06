@@ -5,7 +5,7 @@ import sys
 
 from core.mac import MacRandomizer
 from core.net import CommandExecutor, NetworkConfigurator
-from lib.logger import Logger
+from lib.logger import LogLevel, Logger
 
 
 def parse_arguments():
@@ -38,15 +38,15 @@ def main():
     args = parse_arguments()
 
     # Set up logger
-    logger = Logger()
+    logger = Logger("CLI", None, LogLevel.DEBUG)
 
     # Display banner
-    logger.info("=" * 60)
-    logger.info("Blue Merle - MAC Address Randomizer")
-    logger.info("=" * 60)
+    logger.debug("=" * 60)
+    logger.debug("Blue Merle - MAC Address Randomizer")
+    logger.debug("=" * 60)
 
     if args.dry_run:
-        logger.info("DRY RUN MODE - No changes will be made")
+        logger.debug("DRY RUN MODE - No changes will be made")
 
     # Set up executor
     executor = CommandExecutor(logger)
@@ -54,19 +54,19 @@ def main():
     # Create main randomizer
     randomizer = MacRandomizer(logger, executor)
 
-    # Check if running as root
-    if not randomizer.check_running_as_root() and not args.dry_run:
-        return 1
+    # # Check if running as root
+    # if not randomizer.check_running_as_root() and not args.dry_run:
+    #     return 1
 
-    # Randomize MAC addresses
-    success = randomizer.randomize_mac_addresses(
-        args.interfaces,
-        args.device_index,
-        args.dry_run,
-        args.no_restart
-    )
+    # # Randomize MAC addresses
+    # success = randomizer.randomize_mac_addresses(
+    #     args.interfaces,
+    #     args.device_index,
+    #     args.dry_run,
+    #     args.no_restart
+    # )
 
-    return 0 if success else 1
+    # return 0 if success else 1
 
 
 if __name__ == "__main__":
