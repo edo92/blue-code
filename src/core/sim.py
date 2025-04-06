@@ -1,61 +1,48 @@
 #!/usr/bin/env python3
 
-import argparse
+from src.lib.logger import Logger
+from src.core.modem import ModemController
 import json
 import os
-import re
 import subprocess
-from util.cmd import Cmd
-from lib.logger import Logger
+import sys
+from pathlib import Path
 
-# Define possible TTY devices for the modem
-MODEM_TTY_DEVICES = ["/dev/ttyUSB0", "/dev/ttyUSB3"]
+# Add the src directory to the Python path
+src_path = str(Path(__file__).parent.parent.parent)
+if src_path not in sys.path:
+    sys.path.append(src_path)
 
 
 class SIM:
+    """Class for detecting and managing SIM card information."""
 
-    def __init__(self):
+    def __init__(self, modem_controller=None, verbose=False):
+        """
+        Initialize the SIM detector.
+
+        Args:
+            modem_controller (ModemController): An existing ModemController instance or None to create a new one
+            verbose (bool): Whether to enable verbose logging
+        """
+        self.verbose = verbose
+        self.logger = Logger()
+
+        # Use the provided ModemController or create a new one
+        if modem_controller:
+            self.modem = modem_controller
+        else:
+            self.modem = ModemController(verbose=verbose)
+
+        # Initialize SIM information properties
         self.imsi = None
         self.imei = None
         self.iccid = None
-        self.tty_available = self.check_tty_exists()
-        self.logger = Logger()
 
-    def get_imei(self):
-        """Get the device IMEI"""
-        output = Cmd.run_at_command("AT+GSN")
-        if not output:
-            return None
-
-        # Look for a 15-digit IMEI in the output
-        match = re.search(r'\b([0-9]{14,15})\b', output)
-        if match:
-            return match.group(1)
-        return None
-
-    def get_imsi(self):
-        """Get the SIM IMSI"""
-        output = Cmd.run_at_command("AT+CIMI")
-        if not output:
-            return None
-
-        # Look for a IMSI (usually 15 digits) in the output
-        match = re.search(r'\b([0-9]{6,15})\b', output)
-        if match:
-            return match.group(1)
-        return None
-
-    def get_iccid(self):
-        """Get the SIM ICCID"""
-        output = Cmd.run_at_command("AT+CCID")
-        if not output:
-            return None
-
-        # Look for a ICCID in the output
-        match = re.search(r'\b([0-9]{18,22})\b', output)
-        if match:
-            return match.group(1)
-        return None
+    def log(self, message):
+        """Log a message if verbose mode is enabled."""
+        if self.verbose:
+            self.logger.debug(f"[SIM] {message}")
 
     def check_modem_status(self):
         """Check modem status info"""
@@ -66,10 +53,6 @@ class SIM:
             return result.stdout
         except subprocess.SubprocessError:
             return ""
-
-    def check_tty_exists(self):
-        """Check if the required tty device exists"""
-        return os.path.exists("/dev/ttyUSB3")
 
     def check_sim_detection(self):
         """Check SIM detection in system logs"""
@@ -82,11 +65,19 @@ class SIM:
         except subprocess.SubprocessError:
             return ""
 
-    def check_vsim_profile(self):
-        """Check if vSIM profiles exist"""
+    def _check_profile_status(self, profile_type):
+        """
+        Check the status of a profile type (vsim or esim).
+
+        Args:
+            profile_type (str): Either 'vsim' or 'esim'
+
+        Returns:
+            bool: True if the profile is active, False otherwise
+        """
         try:
-            # Try to access vSIM-specific files or API
-            result = subprocess.run(['ubus', 'call', 'vsim', 'status'],
+            # Try to access profile-specific API
+            result = subprocess.run(['ubus', 'call', profile_type, 'status'],
                                     capture_output=True,
                                     text=True)
             if result.returncode == 0:
@@ -97,86 +88,78 @@ class SIM:
                 except json.JSONDecodeError:
                     pass
 
-                # If we got output but couldn't parse it, check if it contains vsim indicators
-                if 'vsim' in result.stdout.lower() and ('active' in result.stdout.lower() or
-                                                        'enabled' in result.stdout.lower()):
+                # If we got output but couldn't parse it, check if it contains profile indicators
+                if profile_type in result.stdout.lower() and ('active' in result.stdout.lower() or
+                                                              'enabled' in result.stdout.lower()):
                     return True
         except (subprocess.SubprocessError, FileNotFoundError):
             pass
 
-        # Check for vSIM process running
+        # Check for process running
         try:
-            result = subprocess.run(['ps', '|', 'grep', 'vsim'],
+            result = subprocess.run(['ps', '|', 'grep', profile_type],
                                     shell=True,
                                     capture_output=True,
                                     text=True)
-            if 'vsim' in result.stdout and not 'grep vsim' in result.stdout:
+            if profile_type in result.stdout and not f'grep {profile_type}' in result.stdout:
                 return True
         except subprocess.SubprocessError:
             pass
 
+        # For eSIM, also check for application
+        if profile_type == 'esim':
+            try:
+                result = subprocess.run(['ls', '/usr/share/applications/esim'],
+                                        capture_output=True,
+                                        text=True)
+                if result.returncode == 0 and 'esim' in result.stdout:
+                    return True
+            except subprocess.SubprocessError:
+                pass
+
         return False
+
+    def check_vsim_profile(self):
+        """Check if vSIM profiles exist and are active"""
+        return self._check_profile_status('vsim')
 
     def check_esim_profile(self):
-        """Check if eSIM profiles exist"""
-        try:
-            # Try to access eSIM-specific API
-            result = subprocess.run(['ubus', 'call', 'esim', 'status'],
-                                    capture_output=True,
-                                    text=True)
-            if result.returncode == 0:
-                try:
-                    data = json.loads(result.stdout)
-                    if data.get('active') or data.get('status') == 'active':
-                        return True
-                except json.JSONDecodeError:
-                    pass
+        """Check if eSIM profiles exist and are active"""
+        return self._check_profile_status('esim')
 
-                # If we got output but couldn't parse it, check if it contains esim indicators
-                if 'esim' in result.stdout.lower() and ('active' in result.stdout.lower() or
-                                                        'enabled' in result.stdout.lower()):
-                    return True
-        except (subprocess.SubprocessError, FileNotFoundError):
-            pass
+    def fetch_sim_info(self):
+        """
+        Fetch all available SIM information (IMSI, IMEI, ICCID)
 
-        # Check for eSIM process running
-        try:
-            result = subprocess.run(['ps', '|', 'grep', 'esim'],
-                                    shell=True,
-                                    capture_output=True,
-                                    text=True)
-            if 'esim' in result.stdout and not 'grep esim' in result.stdout:
-                return True
-        except subprocess.SubprocessError:
-            pass
+        Returns:
+            dict: Dictionary with SIM information
+        """
+        self.imsi = self.modem.get_imsi()
+        self.imei = self.modem.get_imei()
+        self.iccid = self.modem.get_iccid()
 
-        # Check for eSIM application
-        try:
-            result = subprocess.run(['ls', '/usr/share/applications/esim'],
-                                    capture_output=True,
-                                    text=True)
-            if result.returncode == 0 and 'esim' in result.stdout:
-                return True
-        except subprocess.SubprocessError:
-            pass
-
-        return False
+        return {
+            'imsi': self.imsi,
+            'imei': self.imei,
+            'iccid': self.iccid
+        }
 
     def detect_sim_type(self):
         """
-        Detect what type of SIM is being used in the GL-iNet Mudi v2
+        Detect what type of SIM is being used in the device
 
         Returns:
             str: 'physical', 'virtual', 'esim', or 'unknown'
         """
-        if not self.check_tty_exists():
+        # Check if tty device exists
+        if not os.path.exists(self.modem.tty_device):
             self.logger.error(
                 "TTY device not found. Make sure the modem is properly connected.")
             return "unknown"
 
         # Get IMSI first - if we can't get this, SIM might not be present
-        imsi = self.get_imsi()
-        if not imsi:
+        self.imsi = self.modem.get_imsi()
+        if not self.imsi:
             self.logger.warn(
                 "No IMSI detected. SIM card may not be present or modem may be off.")
 
@@ -192,13 +175,13 @@ class SIM:
 
         # Check for vSIM indicators
         if self.check_vsim_profile():
-            self.logger.info(f"IMSI: {imsi}")
+            self.logger.info(f"IMSI: {self.imsi}")
             self.logger.info("vSIM is active")
             return "virtual"
 
         # Check for eSIM indicators
         if self.check_esim_profile():
-            self.logger.info(f"IMSI: {imsi}")
+            self.logger.info(f"IMSI: {self.imsi}")
             self.logger.info("eSIM is active")
             return "esim"
 
@@ -215,11 +198,11 @@ class SIM:
 
         # If we have an IMSI but no specific indicators of vSIM or eSIM,
         # assume it's a physical SIM
-        if imsi:
-            self.logger.info(f"IMSI: {imsi}")
-            iccid = self.get_iccid()
-            if iccid:
-                self.logger.info(f"ICCID: {iccid}")
+        if self.imsi:
+            self.logger.info(f"IMSI: {self.imsi}")
+            self.iccid = self.modem.get_iccid()
+            if self.iccid:
+                self.logger.info(f"ICCID: {self.iccid}")
             self.logger.info("Physical SIM detected")
             return "physical"
 
