@@ -2,8 +2,9 @@
 
 import re
 import subprocess
+from src.core.mac import MacAddressGenerator
 from src.lib.logger import Logger
-from mac import MacAddressGenerator
+
 
 class CommandExecutor:
     """Handle command execution with proper error handling."""
