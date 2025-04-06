@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 
 
 class LogLevel(Enum):
