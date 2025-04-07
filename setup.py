@@ -1,32 +1,29 @@
+#!/usr/bin/env python3
+
 from setuptools import setup, find_packages
 
 setup(
-    name="bluecode-security",
-    version="0.2.0",
+    name="bluecode",
+    version="0.1.0",
+    description="Privacy and security tools for GL-iNet routers",
+    author="GL-iNet",
     packages=find_packages(),
+    package_dir={"": "."},
     install_requires=[
-        "pyserial>=3.5",
+        "pyserial",  # For modem communication
     ],
     entry_points={
-        'console_scripts': [
-            'bluecode=bluecode.cli:main',
+        "console_scripts": [
+            "gl-privacy=src.cli:main",
         ],
     },
-    include_package_data=True,
-    package_data={
-        'bluecode': ['data/templates/*', 'data/scripts/*'],
-    },
-    scripts=[
-        'scripts/bluecode-service',
-    ],
-    python_requires='>=3.6',
-    description="BlueCode Security Tools to enhance anonymity and reduce forensic traceability",
-    author="GL-iNet",
     classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: System Administrators",
+        "Topic :: System :: Networking",
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: POSIX :: Linux",
-        "Topic :: Security",
-        "Topic :: System :: Networking",
     ],
+    python_requires=">=3.6",
 )
