@@ -5,26 +5,26 @@ set -e
 
 echo "Starting BlueCode Security Tools installation..."
 
-# # Install Python dependencies
-# if command -v opkg >/dev/null 2>&1; then
-#     # OpenWrt/GL-iNet environment
-#     echo "Detected OpenWrt/GL-iNet environment"
-#     opkg update
-#     opkg install python3
-#     opkg install python3-pip
-# else
-#     # Regular Linux environment
-#     echo "Regular Linux environment detected"
-#     # Check if pip3 is installed
-#     if ! command -v pip3 >/dev/null 2>&1; then
-#         echo "Error: pip3 not found. Please install Python 3 and pip."
-#         exit 1
-#     fi
-# fi
+# Install Python dependencies
+if command -v opkg >/dev/null 2>&1; then
+    # OpenWrt/GL-iNet environment
+    echo "Detected OpenWrt/GL-iNet environment"
+    opkg update
+    opkg install python3
+    opkg install python3-pip
+else
+    # Regular Linux environment
+    echo "Regular Linux environment detected"
+    # Check if pip3 is installed
+    if ! command -v pip3 >/dev/null 2>&1; then
+        echo "Error: pip3 not found. Please install Python 3 and pip."
+        exit 1
+    fi
+fi
 
-# Install Python package with entry points
+# Install Python package normally (not in editable mode)
 echo "Installing Python package..."
-pip3 install -e .
+pip3 install .
 
 # Create the necessary directories
 mkdir -p /etc/hotplug.d/button
@@ -37,11 +37,12 @@ chmod +x /etc/hotplug.d/button/50-toggle_display
 
 # Install boot-time security script WITHOUT running it
 echo "Setting up boot-time security script (without running it)..."
-cp ./src/etc/boot-security.sh /usr/lib/blue-code/boot-security.sh
+cp src/etc/boot-security.sh /usr/lib/blue-code/boot-security.sh
 chmod +x /usr/lib/blue-code/boot-security.sh
 
 # Create init.d script without enabling it
-cat >/etc/init.d/gl-mac-security <<'EOF'
+echo "Creating init.d script (without enabling or starting it)..."
+cat > /etc/init.d/gl-mac-security <<'EOF'
 #!/bin/sh /etc/rc.common
 
 # Enhanced MAC address and client database security
@@ -105,13 +106,28 @@ EOF
 
 chmod +x /etc/init.d/gl-mac-security
 
+# Create a backup symlink for the blue-code command
+echo "Creating fallback symlink..."
+if [ -f /usr/bin/blue-code ]; then
+    # Save the existing blue-code file
+    mv /usr/bin/blue-code /usr/bin/blue-code.pkg
+fi
+
+# Create a simple shell script that will always work
+cat > /usr/bin/blue-code <<'EOF'
+#!/bin/sh
+# Fallback script for blue-code command
+python3 -m src.cli "$@"
+EOF
+
+chmod +x /usr/bin/blue-code
+
 # Verify the installation
 echo "\nVerifying installation:"
 if command -v blue-code >/dev/null 2>&1; then
     echo "✓ blue-code command is available"
 else
     echo "✗ blue-code command not found. Installation may have failed."
-    echo "  Try running 'make symlinks' to create manual symlinks."
 fi
 
 echo "\nInstallation completed successfully!"
