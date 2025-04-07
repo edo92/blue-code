@@ -76,8 +76,9 @@ start() {
     umount -t tmpfs -l "$tmpdir" 2>/dev/null
     rmdir "$tmpdir"
     
-    # Run MAC and BSSID randomization
-    blue-code
+    # Run MAC and BSSID randomization WITHOUT IMEI changes at boot
+    # Use a specific set of randomizations that won't trigger a reboot
+    blue-code --randomize mac bssid logs --no-restart
     
     echo "BlueCode security measures initialized"
 }
@@ -137,3 +138,5 @@ echo ""
 echo "Boot-time security successfully installed and started!"
 echo "MAC and BSSID addresses will be randomized on every boot."
 echo "Client database is secured in RAM-only storage."
+echo "IMPORTANT: IMEI randomization is not performed at boot to prevent reboot loops."
+echo "To randomize IMEI manually, run: blue-code --randomize imei"
