@@ -6,9 +6,9 @@ from bluecode.utils.logger import Logger, LogLevel
 from bluecode.core.system import SystemCommand
 from bluecode.core.network import NetworkManager
 from bluecode.core.mac import MacManager
-from bluecode.core.logs import LogManager  # We'll create this later
-from bluecode.core.modem import ModemManager  # We'll create this later
-from bluecode.core.bssid import BssidManager  # We'll create this later
+from bluecode.core.logs import LogManager
+from bluecode.core.modem import ModemManager
+from bluecode.core.bssid import BssidManager
 from bluecode.utils.generators import ImeiGenerator
 
 
@@ -40,7 +40,7 @@ def parse_arguments():
                                help='Do not restart network after changes')
     secure_parser.add_argument('--device-index', type=int, default=None,
                                help='Specific device index to use for WAN interface')
-    secure_parser.add_argument('--randomize', nargs='+', default=['mac'],
+    secure_parser.add_argument('--randomize', nargs='+', default=['all'],
                                choices=['mac', 'bssid', 'imei', 'logs', 'all'],
                                help='What to randomize (default: mac)')
 

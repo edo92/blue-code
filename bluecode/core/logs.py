@@ -3,7 +3,6 @@
 import os
 import re
 import tempfile
-from bluecode.utils.logger import Logger
 
 
 class LogManager:
