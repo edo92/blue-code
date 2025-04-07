@@ -1,5 +1,5 @@
-import argparse
 import sys
+import argparse
 from core.bssid import BSSIDManager
 from core.imei_gen import ImeiGenerator
 from core.log_wiper import LogWiper
