@@ -8,6 +8,8 @@ from lib.logger import Logger
 
 class Cmd:
 
+    """Class for executing commands including AT commands for modems."""
+
     def __init__(self, tty_device=None, verbose=False):
         """
         Initialize the command execution class.
@@ -20,10 +22,65 @@ class Cmd:
         self.verbose = verbose
         self.logger = Logger()
 
-    def log(self, message):
-        """Log a message based on verbosity setting."""
+    def run_command(self, command):
+        """
+        Run a shell command.
+
+        Args:
+            command (str): The shell command to execute
+
+        Returns:
+            tuple: (output_string, exit_code) where exit_code is 0 for success
+        """
         if self.verbose:
-            self.logger.debug(message)
+            self.logger.debug(f"Running shell command: {command}")
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            output = result.stdout
+            if result.stderr:
+                output += "\n" + result.stderr
+
+            if self.verbose:
+                self.logger.debug(
+                    f"Command returned exit code {result.returncode}")
+                self.logger.debug(f"Command output:\n{output.strip()}")
+
+            return output, result.returncode
+
+        except Exception as e:
+            err_msg = f"Error executing command: {e}"
+            self.logger.error(err_msg)
+            return str(e), 1
+
+    def run_at_command(self, command):
+        """
+        Execute an AT command using the best available method.
+        First tries gl_modem if available, then falls back to serial communication.
+
+        Args:
+            command (str): The AT command to execute
+
+        Returns:
+            tuple: (output_string, exit_code) where exit_code is 0 for success
+        """
+        # Check if gl_modem is available
+        if self.is_gl_modem_available():
+            return self.run_gl_modem(command)
+        else:
+            if not self.tty_device:
+                err_msg = "No TTY device specified and gl_modem not available"
+                self.logger.error(err_msg)
+                return err_msg, 1
+            return self.run_serial_command(command)
 
     def run_gl_modem(self, command):
         """
@@ -35,7 +92,8 @@ class Cmd:
         Returns:
             tuple: (output_string, exit_code) where exit_code is 0 for success
         """
-        self.log(f"Running via gl_modem: {command}")
+        if self.verbose:
+            self.logger.debug(f"Running via gl_modem: {command}")
 
         cmd = ["gl_modem", "AT", command]
 
@@ -47,7 +105,8 @@ class Cmd:
             result = subprocess.run(cmd, capture_output=True, text=True)
             out = result.stdout
 
-            self.log(f"gl_modem returned:\n{out.strip()}")
+            if self.verbose:
+                self.logger.debug(f"gl_modem returned:\n{out.strip()}")
 
             # Check for success indication
             if re.search(r"\bOK\b", out, re.IGNORECASE):
@@ -75,7 +134,8 @@ class Cmd:
             self.logger.error(err_msg)
             return err_msg, 1
 
-        self.log(f"Running direct serial command: {command}")
+        if self.verbose:
+            self.logger.debug(f"Running direct serial command: {command}")
 
         try:
             import serial
@@ -88,7 +148,8 @@ class Cmd:
 
                 # Read up to 1024 bytes
                 resp = ser.read(1024).decode(errors='ignore')
-                self.log(f"Serial read:\n{resp.strip()}")
+                if self.verbose:
+                    self.logger.debug(f"Serial read:\n{resp.strip()}")
 
                 if re.search(r"\bOK\b", resp, re.IGNORECASE):
                     return resp, 0
@@ -97,64 +158,6 @@ class Cmd:
 
         except Exception as e:
             err_msg = f"Error executing serial command: {e}"
-            self.logger.error(err_msg)
-            return str(e), 1
-
-    def run_at_command(self, command):
-        """
-        Dynamically choose the best method to run an AT command.
-        First tries gl_modem if available, then falls back to serial communication.
-
-        Args:
-            command (str): The AT command to execute
-
-        Returns:
-            tuple: (output_string, exit_code) where exit_code is 0 for success
-        """
-        # Check if gl_modem is available
-        if os.path.exists("/usr/bin/gl_modem"):
-            return self.run_gl_modem(command)
-        else:
-            if not self.tty_device:
-                err_msg = "No TTY device specified and gl_modem not available"
-                self.logger.error(err_msg)
-                return err_msg, 1
-            return self.run_serial_command(command)
-
-    def run_command(self, command):
-        """
-        Run a shell command.
-
-        Args:
-            command (str): The shell command to execute
-
-        Returns:
-            tuple: (output_string, exit_code) where exit_code is 0 for success
-        """
-        self.log(f"Running shell command: {command}")
-
-        try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-
-            output = result.stdout
-            if result.stderr:
-                output += "\n" + result.stderr
-
-            self.log(f"Command returned exit code {result.returncode}")
-            if self.verbose:
-                self.log(f"Command output:\n{output.strip()}")
-
-            return output, result.returncode
-
-        except Exception as e:
-            err_msg = f"Error executing command: {e}"
             self.logger.error(err_msg)
             return str(e), 1
 
