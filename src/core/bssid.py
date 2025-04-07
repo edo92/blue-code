@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
+import sys
+import time
 import random
 import argparse
-import sys
 from .cmd import Cmd
 from lib.logger import Logger
 
 
-class BSSIDManager:
+class BSSID:
+
     """Class for managing BSSID randomization on wireless interfaces."""
 
     def __init__(self, verbose=False):
@@ -117,6 +119,7 @@ class BSSIDManager:
         """
         self.logger.info("Resetting WiFi to apply changes")
         success, message = self.run_uci_command("wifi", dry_run)
+        time.sleep(1)
 
         if success:
             self.logger.info("WiFi reset successful")
@@ -155,7 +158,7 @@ def main():
     args = parser.parse_args()
 
     # Create BSSID manager
-    manager = BSSIDManager(verbose=args.verbose)
+    manager = BSSID(verbose=args.verbose)
 
     # Set BSSIDs for interfaces
     success, changes = manager.set_bssid_for_interfaces(
