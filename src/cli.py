@@ -60,6 +60,9 @@ def parse_arguments():
     parser.add_argument('--randomize', nargs='+', default=['all'],
                         choices=['mac', 'bssid', 'imei', 'logs', 'all'],
                         help='What to randomize (default: all)')
+    # New optional parameter to control reboot behavior for IMEI randomization
+    parser.add_argument('--no-reboot-imei', action='store_true',
+                        help='Do not reboot after IMEI randomization')
 
     return parser.parse_args()
 
@@ -135,6 +138,10 @@ def process_imei_randomization(reboot_after=True):
 
     if not imei_success:
         logger.error("Failed to randomize IMEI")
+    elif not reboot_after:
+        logger.warning(
+            "IMEI has been changed. A manual reboot is required for changes to take effect.")
+        logger.warning("You can reboot by running the 'reboot' command.")
 
     return imei_success
 
@@ -206,7 +213,10 @@ def main():
 
     # Process IMEI randomization if requested
     if 'imei' in args.randomize:
-        imei_success = process_imei_randomization(reboot_after=True)
+        # Use the no_reboot_imei argument to control reboot behavior
+        # This prevents automatic reboots when run from boot scripts
+        imei_success = process_imei_randomization(
+            reboot_after=not args.no_reboot_imei)
         success = success and imei_success
 
     # Always verify boot-time security is in place
