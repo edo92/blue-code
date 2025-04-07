@@ -19,16 +19,16 @@ A collection of privacy and security enhancement tools for GL-iNet routers.
 
 ```bash
 # Randomize all identifiers
-gl-privacy --randomize all
+bluecode --randomize all
 
 # Only randomize MAC addresses
-gl-privacy --randomize mac
+bluecode --randomize mac
 
 # Dry run to see what would happen
-gl-privacy --randomize all --dry-run
+bluecode --randomize all --dry-run
 
 # With verbose output
-gl-privacy --randomize all --verbose
+bluecode --randomize all --verbose
 ```
 
 ## Options
