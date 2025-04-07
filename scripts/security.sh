@@ -33,14 +33,6 @@ python3 /usr/local/bin/gl-inet-security/cli.py "$@"
 EOF
 chmod +x /usr/bin/gl-security
 
-# Create MAC wiper executable
-echo "Creating MAC wiper executable..."
-cat >/usr/bin/gl-mac-wiper <<'EOF'
-#!/bin/sh
-python3 /usr/local/bin/gl-inet-security/mac_wiper_integration.py "$@"
-EOF
-chmod +x /usr/bin/gl-mac-wiper
-
 # Create init script for boot-time MAC security
 echo "Creating boot-time security init script..."
 cat >"$INIT_SCRIPT" <<'EOF'
@@ -87,7 +79,7 @@ start() {
     rmdir "$tmpdir"
     
     # Run Python-based wiper for additional protection
-    /usr/bin/gl-mac-wiper
+    gl-security --randomize logs --dry-run
     
     echo "GL-iNet MAC address security measures initialized"
 }
@@ -116,9 +108,6 @@ echo "Usage:"
 echo "  gl-security --randomize all      # Randomize all identifiers"
 echo "  gl-security --randomize mac bssid --secure   # Randomize MAC and BSSID with enhanced security"
 echo "  gl-security --help               # Show all options"
-echo ""
-echo "To run the enhanced MAC security manually:"
-echo "  gl-mac-wiper"
 echo ""
 echo "Security services will automatically start on next boot."
 echo "To start services now without rebooting:"
