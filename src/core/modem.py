@@ -5,6 +5,7 @@ import re
 import time
 import string
 import random
+import subprocess
 from .cmd import Cmd
 from lib.logger import Logger
 
@@ -92,7 +93,8 @@ class ModemController:
             bool: True on success, False on failure
         """
         self.logger.info("Enabling modem radio...")
-        out, code = self.run_at_command("AT+CFUN=1")
+        _, code = self.run_at_command("AT+CFUN=1")
+        time.sleep(2)
 
         if code != 0:
             self.logger.warning("Failed to enable radio.")
@@ -109,7 +111,8 @@ class ModemController:
             bool: True on success, False on failure
         """
         self.logger.info("Disabling modem radio...")
-        out, code = self.run_at_command("AT+CFUN=4")
+        _, code = self.run_at_command("AT+CFUN=4")
+        time.sleep(2)
 
         if code != 0:
             self.logger.warning("Failed to disable radio.")
@@ -340,12 +343,13 @@ class ModemController:
             return match.group(1)
         return None
 
-    def set_imei(self, imei):
+    def set_imei(self, imei, reboot_after=False):
         """
         Use AT+EGMR=1,7,"IMEI" to set IMEI. Requires radio disabled first.
 
         Args:
             imei (str): The new IMEI to set
+            reboot_after (bool): Whether to reboot the device after setting IMEI
 
         Returns:
             bool: True if successful, False otherwise
@@ -378,7 +382,28 @@ class ModemController:
         except Exception as e:
             self.log(f"Failed to save IMEI to file: {e}")
 
-        # Re-enable radio
-        self.enable_radio()
+        # Keep radio disabled
+        self.logger.info("Radio will remain disabled until device is rebooted")
+
+        # Reboot the device if requested
+        if reboot_after:
+            self.logger.info("Rebooting device to apply IMEI changes...")
+            try:
+                # Give some time for logs to be written
+                time.sleep(2)
+                # Execute reboot command
+                subprocess.run(["/sbin/reboot"], check=False)
+                # This point may not be reached if reboot is quick
+                return True
+            except Exception as e:
+                self.logger.error(f"Failed to reboot device: {e}")
+                return False
+        else:
+            # Create a flag file to indicate reboot is needed
+            try:
+                with open('/tmp/reboot_required', 'w') as f:
+                    f.write("A reboot is required to apply the new IMEI")
+            except Exception as e:
+                self.log(f"Failed to create reboot flag file: {e}")
 
         return True

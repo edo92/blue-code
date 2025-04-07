@@ -83,10 +83,9 @@ def main():
         # Generate a valid IMEI
         imei = ImeiGenerator.generate_random_imei()
 
-        imei_success = modem.set_imei(imei)
-        if imei_success:
-            logger.info(f"IMEI successfully randomized to: {imei}")
-        else:
+        # Pass reboot_after=True to force a reboot after IMEI change
+        imei_success = modem.set_imei(imei, reboot_after=True)
+        if not imei_success:
             logger.error("Failed to randomize IMEI")
             success = False
 
