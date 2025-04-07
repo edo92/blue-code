@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
 
 import re
+import time
 import subprocess
 from lib.logger import Logger
 from .mac_gen import MacAddressGenerator
@@ -10,12 +10,7 @@ class CommandExecutor:
     """Handle command execution with proper error handling."""
 
     def __init__(self):
-        """
-        Initialize the command executor.
-
-        Args:
-            logger (logging.Logger): Logger instance for output
-        """
+        """Initialize the command executor."""
         self.logger = Logger()
 
     def execute(self, command, dry_run=False, check=True, shell=True):
@@ -67,7 +62,6 @@ class NetworkConfigurator:
         Initialize the network configurator.
 
         Args:
-            logger (logging.Logger): Logger instance for output
             executor (CommandExecutor): Command executor instance
         """
         self.logger = Logger()
@@ -85,6 +79,7 @@ class NetworkConfigurator:
             result = self.executor.execute("uci show network | grep '@device'")
             devices = re.findall(r"network\.@device\[(\d+)\]", result.stdout)
             return [int(d) for d in devices]
+
         except Exception as e:
             self.logger.error(f"Failed to retrieve network devices: {e}")
             return [0]  # Default to device[0] if we can't get the list
@@ -113,7 +108,7 @@ class NetworkConfigurator:
             )
 
             if check_result.returncode != 0 and not dry_run:
-                return self._apply_alternative_wan_mac_change(mac, dry_run)
+                return self._set_wan_mac_alternative(mac, dry_run)
 
             # Standard approach
             self.executor.execute(
@@ -125,10 +120,9 @@ class NetworkConfigurator:
             self.logger.error(f"Failed to set WAN MAC address: {e}")
             return False
 
-    def _apply_alternative_wan_mac_change(self, mac, dry_run=False):
+    def _set_wan_mac_alternative(self, mac, dry_run=False):
         """
-        Apply alternative methods to change the WAN MAC address when the
-        standard approach fails.
+        Try alternative methods to set the WAN MAC address.
 
         Args:
             mac (str): MAC address to set
@@ -140,67 +134,33 @@ class NetworkConfigurator:
         self.logger.warning(
             "Standard device approach failed, trying alternatives")
 
-        # Try to find a physical device to modify
-        if self._try_physical_interface_update(mac, dry_run):
+        # First try: Set MAC address for wan interface directly
+        try:
+            self.executor.execute(
+                f"uci set network.wan.macaddr={mac}", dry_run=dry_run)
+            self.logger.info(f"Set WAN MAC address directly to {mac}")
             return True
+        except Exception as e:
+            self.logger.debug(f"Failed first alternative: {e}")
 
-        # Try to find the WAN interface in a different way
-        return self._try_wan_interface_update(mac, dry_run)
+        # Second try: Use physical interface if available
+        try:
+            interfaces_result = self.executor.execute(
+                "ls -1 /sys/class/net/", check=False)
+            time.sleep(1)
+            if "eth0" in interfaces_result.stdout:
+                self.logger.info("Setting eth0 MAC address directly")
 
-    def _try_physical_interface_update(self, mac, dry_run=False):
-        """
-        Try updating MAC address on a physical interface.
+                if not dry_run:
+                    self.executor.execute(f"ip link set eth0 down")
+                    self.executor.execute(f"ip link set eth0 address {mac}")
+                    self.executor.execute(f"ip link set eth0 up")
+                else:
+                    self.logger.info(f"Would set eth0 MAC to {mac}")
 
-        Args:
-            mac (str): MAC address to set
-            dry_run (bool): If True, only simulate actions
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        interfaces = self.executor.execute(
-            "ls -1 /sys/class/net/", check=False)
-
-        if "eth0" in interfaces.stdout:
-            self.logger.info("Found eth0 interface, setting MAC directly")
-            try:
-                # Set MAC directly using ip link
-                self.executor.execute(
-                    f"ip link set eth0 down", dry_run=dry_run)
-                self.executor.execute(
-                    f"ip link set eth0 address {mac}", dry_run=dry_run)
-                self.executor.execute(f"ip link set eth0 up", dry_run=dry_run)
                 return True
-            except Exception as e:
-                self.logger.error(f"Failed to set MAC using ip link: {e}")
-
-        return False
-
-    def _try_wan_interface_update(self, mac, dry_run=False):
-        """
-        Try updating MAC address on the WAN interface directly.
-
-        Args:
-            mac (str): MAC address to set
-            dry_run (bool): If True, only simulate actions
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        wan_iface_result = self.executor.execute(
-            "uci get network.wan.device", check=False)
-
-        if wan_iface_result.returncode == 0:
-            wan_iface = wan_iface_result.stdout.strip()
-            self.logger.info(f"Found WAN interface: {wan_iface}")
-            try:
-                # Set MAC address for the interface
-                self.executor.execute(
-                    f"uci set network.wan.macaddr={mac}", dry_run=dry_run)
-                return True
-            except Exception as e:
-                self.logger.error(
-                    f"Failed to set MAC for interface {wan_iface}: {e}")
+        except Exception as e:
+            self.logger.debug(f"Failed second alternative: {e}")
 
         return False
 
@@ -219,7 +179,9 @@ class NetworkConfigurator:
             self.logger.info(f"Setting MAC clone address to: {mac}")
             self.executor.execute(
                 f"uci set glconfig.general.macclone_addr={mac}", dry_run=dry_run)
+            time.sleep(1)
             return True
+
         except Exception as e:
             self.logger.error(f"Failed to set MAC clone address: {e}")
             return False
@@ -250,7 +212,7 @@ class NetworkConfigurator:
             if result.returncode == 0:
                 addresses["macclone"] = result.stdout.strip()
 
-            # Get interface MAC addresses
+            # Get physical interface MAC addresses
             for iface in ["eth0", "eth1", "wlan0", "wlan1"]:
                 try:
                     result = self.executor.execute(
@@ -283,6 +245,7 @@ class NetworkConfigurator:
 
             self.logger.info("Changes committed successfully")
             return True
+
         except Exception as e:
             self.logger.error(f"Failed to commit changes: {e}")
             return False
@@ -301,7 +264,9 @@ class NetworkConfigurator:
             self.logger.info("Restarting network to apply changes")
             self.executor.execute(
                 "/etc/init.d/network restart", dry_run=dry_run)
+            time.sleep(2)
             return True
+
         except Exception as e:
             self.logger.error(f"Failed to restart network: {e}")
             return False
