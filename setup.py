@@ -12,6 +12,10 @@ setup(
             'blue-code=src.cli:main',
         ],
     },
+    include_package_data=True,
+    package_data={
+        'src': ['etc/*', 'usr/*'],
+    },
     python_requires='>=3.6',
     description="BlueCode Security Tools to enhance anonymity and reduce forensic traceability",
     author="GL-iNet",
