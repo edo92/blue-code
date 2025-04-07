@@ -7,7 +7,7 @@ import string
 import random
 import subprocess
 from .cmd import Cmd
-from lib.logger import Logger
+from ..lib.logger import Logger
 
 
 class ModemController:

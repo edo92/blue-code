@@ -3,7 +3,7 @@
 import os
 import re
 import subprocess
-from lib.logger import Logger
+from ..lib.logger import Logger
 
 
 class Cmd:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-from lib.logger import Logger
+from ..lib.logger import Logger
 from .net import NetworkConfigurator
 from .mac_gen import MacAddressGenerator
 

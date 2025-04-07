@@ -5,7 +5,7 @@ import time
 import random
 import argparse
 from .cmd import Cmd
-from lib.logger import Logger
+from ..lib.logger import Logger
 
 
 class BSSID:
@@ -118,6 +118,8 @@ class BSSID:
             bool: Success status
         """
         self.logger.info("Resetting WiFi to apply changes")
+        self.logger.info("Rebooting the device. Please wait...")
+
         success, message = self.run_uci_command("wifi", dry_run)
         time.sleep(1)
 

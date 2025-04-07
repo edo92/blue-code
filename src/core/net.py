@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 
 import re
 import time
 import subprocess
-from lib.logger import Logger
+from ..lib.logger import Logger
 from .mac_gen import MacAddressGenerator
 
 
