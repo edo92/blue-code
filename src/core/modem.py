@@ -3,6 +3,8 @@
 import os
 import re
 import time
+import string
+import random
 from .cmd import Cmd
 from lib.logger import Logger
 
@@ -12,6 +14,12 @@ class ModemController:
 
     # Define possible TTY devices for the modem
     MODEM_TTY_DEVICES = ["/dev/ttyUSB0", "/dev/ttyUSB3"]
+
+    # Known TACs for IMEI prefixes
+    KNOWN_TACS = [
+        35675904, 49013920, 49502220, 35250500, 49012241, 35060680,
+        44919451, 35863907, 44814551, 35649604, 35538025, 35480910
+    ]
 
     def __init__(self, tty_device=None, verbose=False):
         """
@@ -24,22 +32,39 @@ class ModemController:
         self.verbose = verbose
         self.logger = Logger()
 
-        # Use specified tty_device or find the first available
+        # Determine SIM type to help select correct TTY device if none specified
         if tty_device:
             self.tty_device = tty_device
         else:
-            self.tty_device = self._find_available_tty()
+            sim_type = self.detect_sim_type_simple()
+            # Use USB0 if virtual, else USB3
+            virtual = sim_type == "virtual"
+            default_tty = '/dev/ttyUSB0' if virtual else '/dev/ttyUSB3'
+            self.tty_device = self._find_available_tty(default_tty)
+
+        self.logger.info(f"Using TTY device: {self.tty_device}")
+
+        # Check the device
+        if not os.path.exists(self.tty_device):
+            self.logger.warning(
+                f"Warning: {self.tty_device} not found. It may appear later.")
 
         self.cmd = Cmd(self.tty_device, verbose)
 
-    def _find_available_tty(self):
+    def _find_available_tty(self, preferred_tty=None):
         """Find the first available TTY device from the list."""
+        # If preferred TTY is specified and exists, use it
+        if preferred_tty and os.path.exists(preferred_tty):
+            return preferred_tty
+
+        # Otherwise find first available
         for device in self.MODEM_TTY_DEVICES:
             if os.path.exists(device):
                 return device
-        # Default to the first one if none found
-        self.logger.warning(
-            f"No TTY device found, defaulting to {self.MODEM_TTY_DEVICES[0]}")
+
+        # Default to the preferred or first one if none found
+        if preferred_tty:
+            return preferred_tty
         return self.MODEM_TTY_DEVICES[0]
 
     def log(self, message):
@@ -66,7 +91,15 @@ class ModemController:
         Returns:
             bool: True on success, False on failure
         """
-        return self.control_radio(enable=True)
+        self.logger.info("Enabling modem radio...")
+        out, code = self.run_at_command("AT+CFUN=1")
+
+        if code != 0:
+            self.logger.warning("Failed to enable radio.")
+            return False
+
+        self.logger.info("Radio enabled.")
+        return True
 
     def disable_radio(self):
         """
@@ -75,29 +108,14 @@ class ModemController:
         Returns:
             bool: True on success, False on failure
         """
-        return self.control_radio(enable=False)
-
-    def control_radio(self, enable=True):
-        """
-        Enable or disable the modem radio TX/RX.
-
-        Args:
-            enable (bool): True to enable radio (AT+CFUN=1), False to disable (AT+CFUN=4)
-
-        Returns:
-            bool: True on success, False on failure
-        """
-        mode = 1 if enable else 4
-        status = "Enabling" if enable else "Disabling"
-
-        self.logger.info(f"{status} modem radio...")
-        _, code = self.run_at_command(f"AT+CFUN={mode}")
+        self.logger.info("Disabling modem radio...")
+        out, code = self.run_at_command("AT+CFUN=4")
 
         if code != 0:
-            self.logger.warning(f"Failed to {status.lower()} radio.")
+            self.logger.warning("Failed to disable radio.")
             return False
 
-        self.logger.info(f"Radio {'enabled' if enable else 'disabled'}.")
+        self.logger.info("Radio disabled.")
         return True
 
     def wait_for_device_state(self, should_exist, timeout=60, poll_interval=1):
@@ -170,11 +188,13 @@ class ModemController:
             # We can continue anyway, but the modem might not power off properly.
 
         # Wait for device to disappear
+        self.logger.info("Waiting for device to disappear after QPOWD...")
         if not self.wait_for_device_gone(timeout=30):
             self.logger.warning(
                 "Modem device did not vanish. Trying to continue anyway...")
 
         # Wait for device to reappear
+        self.logger.info("Waiting for device to reappear...")
         if not self.wait_for_device_present(timeout=60):
             self.logger.error(
                 "Modem device did not reappear in time. Restart failed.")
@@ -197,8 +217,85 @@ class ModemController:
         self.logger.error("Modem restart timed out or no IMSI read.")
         return False
 
+    def generate_luhn_checksum(self, digits):
+        """
+        Generate Luhn algorithm checksum for IMEI validation.
+
+        Args:
+            digits (str): String of digits to calculate checksum for
+
+        Returns:
+            int: Check digit (0-9)
+        """
+        checksum = 0
+        for i, d in enumerate(reversed(str(digits))):
+            n = int(d)
+            if i % 2 == 1:
+                n *= 2
+                if n > 9:
+                    n -= 9
+            checksum += n
+        return (10 - (checksum % 10)) % 10
+
+    def generate_random_imei(self, deterministic=False):
+        """
+        Generate a valid 15-digit IMEI.
+
+        Args:
+            deterministic (bool): If True, use IMSI as seed for RNG
+
+        Returns:
+            str: A valid 15-digit IMEI number
+        """
+        # Seed the RNG if deterministic
+        if deterministic:
+            imsi = self.get_imsi()
+            if imsi:
+                random.seed(imsi)
+                self.log(
+                    f"Using IMSI {imsi} as RNG seed for deterministic IMEI.")
+            else:
+                self.log("IMSI unavailable; falling back to random seed.")
+
+        # Pick random TAC (Type Allocation Code)
+        tac = str(random.choice(self.KNOWN_TACS))
+        self.log(f"Selected TAC: {tac}")
+
+        # Fill up to 14 digits
+        remain_len = 14 - len(tac)
+        random_part = ''.join(random.choice(string.digits)
+                              for _ in range(remain_len))
+
+        imei_base = tac + random_part
+        self.log(f"Base IMEI (no check digit): {imei_base}")
+
+        # Add Luhn check digit
+        check_digit = self.generate_luhn_checksum(imei_base)
+        imei = imei_base + str(check_digit)
+        self.logger.info(f"Generated final IMEI: {imei}")
+
+        return imei
+
+    def detect_sim_type_simple(self):
+        """
+        Simple detection of SIM type (virtual or physical).
+
+        Returns:
+            str: "virtual" if virtual SIM detected, otherwise "physical"
+        """
+        # Check for vSIM indicators
+        if os.path.exists("/tmp/vsim") or os.path.exists("/etc/vsim"):
+            return "virtual"
+
+        return "physical"
+
     def get_imsi(self):
-        """Get the SIM IMSI"""
+        """
+        Get the SIM IMSI.
+
+        Returns:
+            str: IMSI or None if not available
+        """
         output, _ = self.run_at_command("AT+CIMI")
         if not output:
             return None
@@ -210,7 +307,12 @@ class ModemController:
         return None
 
     def get_imei(self):
-        """Get the device IMEI"""
+        """
+        Get the device IMEI.
+
+        Returns:
+            str: IMEI or None if not available
+        """
         output, _ = self.run_at_command("AT+GSN")
         if not output:
             return None
@@ -222,7 +324,12 @@ class ModemController:
         return None
 
     def get_iccid(self):
-        """Get the SIM ICCID"""
+        """
+        Get the SIM ICCID.
+
+        Returns:
+            str: ICCID or None if not available
+        """
         output, _ = self.run_at_command("AT+CCID")
         if not output:
             return None
@@ -270,5 +377,8 @@ class ModemController:
             self.log("Saved IMEI to /tmp/modem.1-1.2/modem-imei")
         except Exception as e:
             self.log(f"Failed to save IMEI to file: {e}")
+
+        # Re-enable radio
+        self.enable_radio()
 
         return True
