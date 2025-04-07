@@ -3,10 +3,14 @@
 import os
 import re
 import tempfile
+from lib.logger import Logger
 
 
 class LogWiper:
-    """Class for wiping MAC addresses from system logs with strong anti-forensic measures."""
+    """
+    Enhanced class for wiping MAC addresses from system logs with strong anti-forensic measures.
+    Complete replacement for the original LogWiper with stronger security guarantees.
+    """
 
     # Client database location (from original implementation)
     CLIENT_DB_PATH = "/etc/oui-tertf"
@@ -88,7 +92,7 @@ class LogWiper:
             self.logger.info(f"Created temporary directory: {tmp_dir}")
 
             # Mount tmpfs to temporary directory
-            self.executor.execute(f"mount -t tmpfs / {tmp_dir}")
+            self.executor.execute(f"mount -t tmpfs tmpfs {tmp_dir}")
 
             # Backup client database if it exists
             if os.path.exists(self.CLIENT_DB_FILE):
@@ -103,7 +107,8 @@ class LogWiper:
                 f"umount -t tmpfs -l {self.CLIENT_DB_PATH}", check=False)
 
             # Mount tmpfs at client database location
-            self.executor.execute(f"mount -t tmpfs / {self.CLIENT_DB_PATH}")
+            self.executor.execute(
+                f"mount -t tmpfs tmpfs {self.CLIENT_DB_PATH}")
 
             # Restore database structure if backup exists
             if os.path.exists(f"{tmp_dir}/client.db"):
@@ -359,6 +364,40 @@ class LogWiper:
 
         return True
 
+    def check_init_script(self):
+        """
+        Check if the init script is properly installed and enabled.
+
+        Returns:
+            bool: True if script is installed and enabled, False otherwise
+        """
+        try:
+            # Check if script exists
+            script_exists = os.path.exists("/etc/init.d/gl-mac-security")
+
+            # Check if script is enabled (linked in rc.d)
+            enabled = False
+            if script_exists:
+                result = self.executor.execute(
+                    "ls -la /etc/rc.d/S*gl-mac-security 2>/dev/null", check=False)
+                enabled = result.returncode == 0
+
+            if not script_exists:
+                self.logger.warning(
+                    "Boot-time security script not found. Security will not persist across reboots.")
+                return False
+
+            if not enabled:
+                self.logger.warning(
+                    "Boot-time security script exists but is not enabled. Run 'chmod +x /etc/init.d/gl-mac-security && /etc/init.d/gl-mac-security enable' to enable it.")
+                return False
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to check init script status: {e}")
+            return False
+
     def wipe_mac_logs(self, dry_run=False):
         """
         Comprehensive MAC address wiping with anti-forensic measures.
@@ -402,40 +441,17 @@ class LogWiper:
         if not dry_run:
             self._restart_related_services()
 
+        # 7. Check if init script is installed for boot-time protection
+        if not dry_run:
+            init_status = self.check_init_script()
+            if not init_status:
+                self.logger.error(
+                    "SECURITY WARNING: Boot-time protection script not properly installed.")
+                self.logger.error(
+                    "This is a critical security issue that must be fixed immediately.")
+                self.logger.error(
+                    "Run the installation script to ensure proper security measures.")
+
         self.logger.info(
             "MAC address wiping with anti-forensic measures completed")
         return success
-
-    def check_init_script(self):
-        """
-        Check if the init script is properly installed and enabled.
-
-        Returns:
-            bool: True if script is installed and enabled, False otherwise
-        """
-        try:
-            # Check if script exists
-            script_exists = os.path.exists("/etc/init.d/gl-mac-security")
-
-            # Check if script is enabled (linked in rc.d)
-            enabled = False
-            if script_exists:
-                result = self.executor.execute(
-                    "ls -la /etc/rc.d/S*gl-mac-security 2>/dev/null", check=False)
-                enabled = result.returncode == 0
-
-            if not script_exists:
-                self.logger.warning(
-                    "Boot-time security script not found. Security will not persist across reboots.")
-                return False
-
-            if not enabled:
-                self.logger.warning(
-                    "Boot-time security script exists but is not enabled. Run 'chmod +x /etc/init.d/gl-mac-security && /etc/init.d/gl-mac-security enable' to enable it.")
-                return False
-
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to check init script status: {e}")
-            return False
