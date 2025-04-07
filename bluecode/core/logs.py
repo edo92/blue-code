@@ -5,14 +5,13 @@ import re
 import tempfile
 
 
-class LogWiper:
-
+class LogManager:
     """
     Enhanced class for wiping MAC addresses from system logs with strong anti-forensic measures.
     Complete replacement for the original LogWiper with stronger security guarantees.
     """
 
-    # Client database location (from original implementation)
+    # Client database location
     CLIENT_DB_PATH = "/etc/oui-tertf"
     CLIENT_DB_FILE = os.path.join(CLIENT_DB_PATH, "client.db")
 
@@ -48,11 +47,11 @@ class LogWiper:
 
     def __init__(self, logger, executor):
         """
-        Initialize the enhanced log wiper.
+        Initialize the enhanced log manager.
 
         Args:
-            logger (logging.Logger): Logger instance
-            executor (CommandExecutor): Command executor instance
+            logger (Logger): Logger instance
+            executor (SystemCommand): Command executor instance
         """
         self.logger = logger
         self.executor = executor
@@ -92,31 +91,31 @@ class LogWiper:
             self.logger.info(f"Created temporary directory: {tmp_dir}")
 
             # Mount tmpfs to temporary directory
-            self.executor.execute(f"mount -t tmpfs tmpfs {tmp_dir}")
+            self.executor.run_command(f"mount -t tmpfs tmpfs {tmp_dir}")
 
             # Backup client database if it exists
             if os.path.exists(self.CLIENT_DB_FILE):
-                self.executor.execute(
+                self.executor.run_command(
                     f"cp -a {self.CLIENT_DB_FILE} {tmp_dir}/")
 
                 # Securely shred the original database
                 self.secure_delete_file(self.CLIENT_DB_FILE)
 
             # Unmount any existing tmpfs at client database location
-            self.executor.execute(
+            self.executor.run_command(
                 f"umount -t tmpfs -l {self.CLIENT_DB_PATH}", check=False)
 
             # Mount tmpfs at client database location
-            self.executor.execute(
+            self.executor.run_command(
                 f"mount -t tmpfs tmpfs {self.CLIENT_DB_PATH}")
 
             # Restore database structure if backup exists
             if os.path.exists(f"{tmp_dir}/client.db"):
-                self.executor.execute(
+                self.executor.run_command(
                     f"cp -a {tmp_dir}/client.db {self.CLIENT_DB_PATH}/")
 
             # Clean up temporary directory
-            self.executor.execute(f"umount -t tmpfs -l {tmp_dir}")
+            self.executor.run_command(f"umount -t tmpfs -l {tmp_dir}")
             os.rmdir(tmp_dir)
 
             self.logger.info(
@@ -142,9 +141,9 @@ class LogWiper:
 
             # Try using shred (preferred method)
             try:
-                result = self.executor.execute(
-                    f"shred --force --zero --remove {filepath}", check=False)
-                if result.returncode == 0:
+                result = self.executor.run_command(
+                    f"shred --force --zero --remove {filepath}")
+                if result[1] == 0:
                     return True
             except Exception:
                 self.logger.warning(
@@ -339,7 +338,7 @@ class LogWiper:
 
         try:
             # Clear dmesg buffer (requires root)
-            self.executor.execute("dmesg -c > /dev/null", check=False)
+            self.executor.run_command("dmesg -c > /dev/null")
             return True
         except Exception as e:
             self.logger.error(f"Failed to clear dmesg buffer: {e}")
@@ -357,7 +356,7 @@ class LogWiper:
         for service in self.RELATED_SERVICES:
             try:
                 # Check if service exists and restart it
-                self.executor.execute(
+                self.executor.run_command(
                     f"/etc/init.d/{service} restart", check=False)
             except Exception:
                 pass
@@ -378,9 +377,9 @@ class LogWiper:
             # Check if script is enabled (linked in rc.d)
             enabled = False
             if script_exists:
-                result = self.executor.execute(
-                    "ls -la /etc/rc.d/S*gl-mac-security 2>/dev/null", check=False)
-                enabled = result.returncode == 0
+                result = self.executor.run_command(
+                    "ls -la /etc/rc.d/S*gl-mac-security 2>/dev/null")
+                enabled = result[1] == 0
 
             if not script_exists:
                 self.logger.warning(
@@ -431,11 +430,11 @@ class LogWiper:
         # 5. Additional forensic countermeasures
         if not dry_run:
             # Flush file system buffers
-            self.executor.execute("sync", check=False)
+            self.executor.run_command("sync")
 
             # Clear file system journal if possible
-            self.executor.execute(
-                "echo 1 > /proc/sys/vm/drop_caches", check=False)
+            self.executor.run_command(
+                "echo 1 > /proc/sys/vm/drop_caches")
 
         # 6. Restart related services
         if not dry_run:

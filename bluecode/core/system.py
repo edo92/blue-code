@@ -3,12 +3,11 @@
 import os
 import re
 import subprocess
-from ..lib.logger import Logger
+from bluecode.utils.logger import Logger
 
 
-class Cmd:
-
-    """Class for executing commands including AT commands for modems."""
+class SystemCommand:
+    """Class for executing system commands including AT commands for modems."""
 
     def __init__(self, tty_device=None, verbose=False):
         """

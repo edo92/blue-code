@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 
 import os
-from ..lib.logger import Logger
-from .net import NetworkConfigurator
-from .mac_gen import MacAddressGenerator
+from bluecode.utils.logger import Logger
+from bluecode.core.network import NetworkManager
+from bluecode.utils.generators import MacGenerator
 
 
-class MacRandomizer:
-
-    """Main class for MAC address randomization."""
+class MacManager:
+    """Main class for MAC address randomization and management."""
 
     def __init__(self, executor):
         """
-        Initialize the MAC randomizer.
+        Initialize the MAC manager.
 
         Args:
-            executor (CommandExecutor): Command executor instance
+            executor (SystemCommand): Command executor instance
         """
         self.logger = Logger()
         self.executor = executor
-        self.network = NetworkConfigurator(executor)
+        self.network = NetworkManager(executor)
 
     def check_running_as_root(self):
         """
@@ -107,11 +106,13 @@ class MacRandomizer:
 
         # All devices failed, try direct approach
         self.logger.info("Trying direct MAC change approach")
-        mac = MacAddressGenerator.generate_unicast_mac()
+        mac = MacGenerator.generate_unicast_mac()
 
         try:
-            self.executor.execute(
-                f"uci set network.wan.macaddr={mac}", dry_run=dry_run)
+            if not dry_run:
+                self.executor.run_command(f"uci set network.wan.macaddr={mac}")
+            else:
+                self.logger.info(f"Would set network.wan.macaddr to {mac}")
             return True
         except Exception as e:
             self.logger.warning(f"Failed direct MAC set approach: {e}")

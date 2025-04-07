@@ -2,13 +2,14 @@
 
 import sys
 import argparse
-from src.lib.logger import Logger, LogLevel
-from src.core.net import CommandExecutor, NetworkConfigurator
-from src.core.modem import ModemController
-from src.core.mac import MacRandomizer
-from src.core.log_wiper import LogWiper
-from src.core.imei_gen import ImeiGenerator
-from src.core.bssid import BSSID
+from bluecode.utils.logger import Logger, LogLevel
+from bluecode.core.system import SystemCommand
+from bluecode.core.network import NetworkManager
+from bluecode.core.mac import MacManager
+from bluecode.core.logs import LogManager
+from bluecode.core.modem import ModemManager
+from bluecode.core.bssid import BssidManager
+from bluecode.utils.generators import ImeiGenerator
 
 
 def parse_arguments():
@@ -25,8 +26,6 @@ def parse_arguments():
     # Command handling
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 
-    # Default behavior - run all randomizations
-
     # 'secure' subcommand for backward compatibility
     secure_parser = subparsers.add_parser(
         'secure', help='Run with options (for backward compatibility)')
@@ -34,14 +33,14 @@ def parse_arguments():
                                help='Simulate actions without making changes')
     secure_parser.add_argument('--verbose', '-v', action='store_true',
                                help='Enable verbose logging')
-    secure_parser.add_argument('--interfaces', nargs='+', default=NetworkConfigurator.DEFAULT_INTERFACES,
+    secure_parser.add_argument('--interfaces', nargs='+', default=NetworkManager.DEFAULT_INTERFACES,
                                choices=['wan', 'upstream', 'all'],
                                help='Interfaces to randomize (default: wan upstream)')
     secure_parser.add_argument('--no-restart', action='store_true',
                                help='Do not restart network after changes')
     secure_parser.add_argument('--device-index', type=int, default=None,
                                help='Specific device index to use for WAN interface')
-    secure_parser.add_argument('--randomize', nargs='+', default=['mac'],
+    secure_parser.add_argument('--randomize', nargs='+', default=['all'],
                                choices=['mac', 'bssid', 'imei', 'logs', 'all'],
                                help='What to randomize (default: mac)')
 
@@ -50,7 +49,7 @@ def parse_arguments():
                         help='Simulate actions without making changes')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
-    parser.add_argument('--interfaces', nargs='+', default=NetworkConfigurator.DEFAULT_INTERFACES,
+    parser.add_argument('--interfaces', nargs='+', default=NetworkManager.DEFAULT_INTERFACES,
                         choices=['wan', 'upstream', 'all'],
                         help='Interfaces to randomize (default: wan upstream)')
     parser.add_argument('--no-restart', action='store_true',
@@ -60,6 +59,8 @@ def parse_arguments():
     parser.add_argument('--randomize', nargs='+', default=['all'],
                         choices=['mac', 'bssid', 'imei', 'logs', 'all'],
                         help='What to randomize (default: all)')
+    parser.add_argument('--no-reboot-imei', action='store_true',
+                        help='Do not reboot after IMEI randomization')
 
     return parser.parse_args()
 
@@ -69,7 +70,7 @@ def process_bssid_randomization(bssid_manager, dry_run, no_restart):
     Process BSSID randomization.
 
     Args:
-        bssid_manager (BSSIDManager): BSSID manager instance
+        bssid_manager (BssidManager): BSSID manager instance
         dry_run (bool): If True, only simulate actions
         no_restart (bool): If True, do not restart after changes
 
@@ -88,12 +89,12 @@ def process_bssid_randomization(bssid_manager, dry_run, no_restart):
     return bssid_success
 
 
-def process_mac_randomization(mac_randomizer, interfaces, device_index, dry_run, no_restart):
+def process_mac_randomization(mac_manager, interfaces, device_index, dry_run, no_restart):
     """
     Process MAC address randomization.
 
     Args:
-        mac_randomizer (MacRandomizer): MAC randomizer instance
+        mac_manager (MacManager): MAC manager instance
         interfaces (list): Interfaces to randomize
         device_index (int): Specific device index to use
         dry_run (bool): If True, only simulate actions
@@ -105,7 +106,7 @@ def process_mac_randomization(mac_randomizer, interfaces, device_index, dry_run,
     logger = Logger()
     logger.info("Randomizing MAC addresses...")
 
-    return mac_randomizer.randomize_mac_addresses(
+    return mac_manager.randomize_mac_addresses(
         interfaces,
         device_index,
         dry_run,
@@ -126,7 +127,7 @@ def process_imei_randomization(reboot_after=True):
     logger = Logger()
     logger.info("Randomizing IMEI...")
 
-    modem = ModemController()
+    modem = ModemManager()
     # Generate a valid IMEI
     imei = ImeiGenerator.generate_random_imei()
 
@@ -135,6 +136,10 @@ def process_imei_randomization(reboot_after=True):
 
     if not imei_success:
         logger.error("Failed to randomize IMEI")
+    elif not reboot_after:
+        logger.warning(
+            "IMEI has been changed. A manual reboot is required for changes to take effect.")
+        logger.warning("You can reboot by running the 'reboot' command.")
 
     return imei_success
 
@@ -145,21 +150,21 @@ def process_log_wiping(logger, executor, dry_run):
 
     Args:
         logger (Logger): Logger instance
-        executor (CommandExecutor): Command executor instance
+        executor (SystemCommand): Command executor instance
         dry_run (bool): If True, only simulate actions
 
     Returns:
         bool: True if successful, False otherwise
     """
-    # Create wiper with enhanced security
-    wiper = LogWiper(logger, executor)
+    # Create log manager
+    log_manager = LogManager(logger, executor)
 
     # Run comprehensive wiping
-    success = wiper.wipe_mac_logs(dry_run)
+    success = log_manager.wipe_mac_logs(dry_run)
 
     # Check boot-time security script
     if success and not dry_run:
-        init_status = wiper.check_init_script()
+        init_status = log_manager.check_init_script()
         if not init_status:
             logger.warning(
                 "Boot-time security will not persist across reboots. Install script needs to be properly configured.")
@@ -176,12 +181,12 @@ def main():
     if args.verbose:
         logger.logger.setLevel(LogLevel.DEBUG)
 
-    executor = CommandExecutor()
-    mac_randomizer = MacRandomizer(executor)
-    bssid_manager = BSSID(verbose=args.verbose)
+    executor = SystemCommand()
+    mac_manager = MacManager(executor)
+    bssid_manager = BssidManager(verbose=args.verbose)
 
     # Check if running as root for non-dry-run operations
-    if not mac_randomizer.check_running_as_root() and not args.dry_run:
+    if not mac_manager.check_running_as_root() and not args.dry_run:
         logger.error("This script must be run as root")
         return 1
 
@@ -200,19 +205,22 @@ def main():
     # Process MAC address randomization if requested
     if 'mac' in args.randomize:
         mac_success = process_mac_randomization(
-            mac_randomizer, args.interfaces, args.device_index,
+            mac_manager, args.interfaces, args.device_index,
             args.dry_run, args.no_restart)
         success = success and mac_success
 
     # Process IMEI randomization if requested
     if 'imei' in args.randomize:
-        imei_success = process_imei_randomization(reboot_after=True)
+        # Use the no_reboot_imei argument to control reboot behavior
+        # This prevents automatic reboots when run from boot scripts
+        imei_success = process_imei_randomization(
+            reboot_after=not args.no_reboot_imei)
         success = success and imei_success
 
     # Always verify boot-time security is in place
     logger.info("Verifying boot-time security measures...")
-    wiper = LogWiper(logger, executor)
-    init_status = wiper.check_init_script()
+    log_manager = LogManager(logger, executor)
+    init_status = log_manager.check_init_script()
 
     if not init_status and not args.dry_run:
         logger.error(

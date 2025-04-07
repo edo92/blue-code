@@ -3,28 +3,20 @@
 import os
 import re
 import time
-import string
-import random
 import subprocess
-from .cmd import Cmd
-from ..lib.logger import Logger
+from bluecode.utils.logger import Logger
+from bluecode.core.system import SystemCommand
 
 
-class ModemController:
+class ModemManager:
     """Class for controlling modem hardware state and communications."""
 
     # Define possible TTY devices for the modem
     MODEM_TTY_DEVICES = ["/dev/ttyUSB0", "/dev/ttyUSB3"]
 
-    # Known TACs for IMEI prefixes
-    KNOWN_TACS = [
-        35675904, 49013920, 49502220, 35250500, 49012241, 35060680,
-        44919451, 35863907, 44814551, 35649604, 35538025, 35480910
-    ]
-
     def __init__(self, tty_device=None, verbose=False):
         """
-        Initialize the modem controller.
+        Initialize the modem manager.
 
         Args:
             tty_device (str): TTY device path to use (defaults to first available from MODEM_TTY_DEVICES)
@@ -50,7 +42,7 @@ class ModemController:
             self.logger.warning(
                 f"Warning: {self.tty_device} not found. It may appear later.")
 
-        self.cmd = Cmd(self.tty_device, verbose)
+        self.cmd = SystemCommand(self.tty_device, verbose)
 
     def _find_available_tty(self, preferred_tty=None):
         """Find the first available TTY device from the list."""
@@ -71,11 +63,11 @@ class ModemController:
     def log(self, message):
         """Log a message if verbose mode is enabled."""
         if self.verbose:
-            self.logger.debug(f"[ModemController] {message}")
+            self.logger.debug(f"[ModemManager] {message}")
 
     def run_at_command(self, command):
         """
-        Run the given AT command via the Cmd class.
+        Run the given AT command via the SystemCommand class.
 
         Args:
             command (str): The AT command to run
@@ -111,7 +103,7 @@ class ModemController:
             bool: True on success, False on failure
         """
         self.logger.info("Disabling modem radio...")
-        _, code = self.run_at_command("AT+CFUN=4")
+        output, code = self.run_at_command("AT+CFUN=4")
         time.sleep(2)
 
         if code != 0:
@@ -219,65 +211,6 @@ class ModemController:
 
         self.logger.error("Modem restart timed out or no IMSI read.")
         return False
-
-    def generate_luhn_checksum(self, digits):
-        """
-        Generate Luhn algorithm checksum for IMEI validation.
-
-        Args:
-            digits (str): String of digits to calculate checksum for
-
-        Returns:
-            int: Check digit (0-9)
-        """
-        checksum = 0
-        for i, d in enumerate(reversed(str(digits))):
-            n = int(d)
-            if i % 2 == 1:
-                n *= 2
-                if n > 9:
-                    n -= 9
-            checksum += n
-        return (10 - (checksum % 10)) % 10
-
-    def generate_random_imei(self, deterministic=False):
-        """
-        Generate a valid 15-digit IMEI.
-
-        Args:
-            deterministic (bool): If True, use IMSI as seed for RNG
-
-        Returns:
-            str: A valid 15-digit IMEI number
-        """
-        # Seed the RNG if deterministic
-        if deterministic:
-            imsi = self.get_imsi()
-            if imsi:
-                random.seed(imsi)
-                self.log(
-                    f"Using IMSI {imsi} as RNG seed for deterministic IMEI.")
-            else:
-                self.log("IMSI unavailable; falling back to random seed.")
-
-        # Pick random TAC (Type Allocation Code)
-        tac = str(random.choice(self.KNOWN_TACS))
-        self.log(f"Selected TAC: {tac}")
-
-        # Fill up to 14 digits
-        remain_len = 14 - len(tac)
-        random_part = ''.join(random.choice(string.digits)
-                              for _ in range(remain_len))
-
-        imei_base = tac + random_part
-        self.log(f"Base IMEI (no check digit): {imei_base}")
-
-        # Add Luhn check digit
-        check_digit = self.generate_luhn_checksum(imei_base)
-        imei = imei_base + str(check_digit)
-        self.logger.info(f"Generated final IMEI: {imei}")
-
-        return imei
 
     def detect_sim_type_simple(self):
         """

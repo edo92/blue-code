@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
 
-
 import json
 import os
 import subprocess
-from ..lib.logger import Logger
-from .modem import ModemController
+from bluecode.utils.logger import Logger
+from bluecode.core.modem import ModemManager
 
 
-class SIM:
+class SimManager:
     """Class for detecting and managing SIM card information."""
 
-    def __init__(self, modem_controller=None, verbose=False):
+    def __init__(self, modem_manager=None, verbose=False):
         """
-        Initialize the SIM detector.
+        Initialize the SIM manager.
 
         Args:
-            modem_controller (ModemController): An existing ModemController instance or None to create a new one
+            modem_manager (ModemManager): An existing ModemManager instance or None to create a new one
             verbose (bool): Whether to enable verbose logging
         """
         self.verbose = verbose
         self.logger = Logger()
 
-        # Use the provided ModemController or create a new one
-        if modem_controller:
-            self.modem = modem_controller
+        # Use the provided ModemManager or create a new one
+        if modem_manager:
+            self.modem = modem_manager
         else:
-            self.modem = ModemController(verbose=verbose)
+            self.modem = ModemManager(verbose=verbose)
 
         # Initialize SIM information properties
         self.imsi = None
@@ -36,7 +35,7 @@ class SIM:
     def log(self, message):
         """Log a message if verbose mode is enabled."""
         if self.verbose:
-            self.logger.debug(f"[SIM] {message}")
+            self.logger.debug(f"[SimManager] {message}")
 
     def check_modem_status(self):
         """Check modem status info"""

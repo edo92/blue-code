@@ -1,74 +1,27 @@
 #!/usr/bin/env python3
 
-
 import re
 import time
-import subprocess
-from ..lib.logger import Logger
-from .mac_gen import MacAddressGenerator
+from bluecode.utils.logger import Logger
+from bluecode.utils.generators import MacGenerator
 
 
-class CommandExecutor:
-    """Handle command execution with proper error handling."""
-
-    def __init__(self):
-        """Initialize the command executor."""
-        self.logger = Logger()
-
-    def execute(self, command, dry_run=False, check=True, shell=True):
-        """
-        Execute a shell command with proper error handling.
-
-        Args:
-            command (str): Command to execute
-            dry_run (bool): If True, only print the command without executing
-            check (bool): If True, raise exception on command failure
-            shell (bool): If True, use shell to execute command
-
-        Returns:
-            subprocess.CompletedProcess: Result of the command execution
-        """
-        self.logger.debug(f"Executing: {command}")
-
-        if dry_run:
-            self.logger.info(f"Would execute: {command}")
-            # Create a mock CompletedProcess for dry runs
-            return subprocess.CompletedProcess(args=command, returncode=0, stdout='', stderr='')
-
-        try:
-            result = subprocess.run(
-                command,
-                shell=shell,
-                check=check,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            return result
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Command failed: {command}")
-            self.logger.error(f"Error output: {e.stderr}")
-            if check:
-                raise
-            return e
-
-
-class NetworkConfigurator:
-    """Handle network device configuration."""
+class NetworkManager:
+    """Handle network device configuration and management."""
 
     # Constants
     DEFAULT_INTERFACES = ["wan", "upstream"]
 
     def __init__(self, executor):
         """
-        Initialize the network configurator.
+        Initialize the network manager.
 
         Args:
-            executor (CommandExecutor): Command executor instance
+            executor (SystemCommand): Command executor instance
         """
         self.logger = Logger()
         self.executor = executor
-        self.mac_generator = MacAddressGenerator()
+        self.mac_generator = MacGenerator()
 
     def get_network_devices(self):
         """
@@ -78,8 +31,9 @@ class NetworkConfigurator:
             list: List of network device indices
         """
         try:
-            result = self.executor.execute("uci show network | grep '@device'")
-            devices = re.findall(r"network\.@device\[(\d+)\]", result.stdout)
+            result = self.executor.run_command(
+                "uci show network | grep '@device'")
+            devices = re.findall(r"network\.@device\[(\d+)\]", result[0])
             return [int(d) for d in devices]
 
         except Exception as e:
@@ -103,20 +57,21 @@ class NetworkConfigurator:
                 f"Setting WAN interface (device[{device_index}]) MAC to: {mac}")
 
             # First check if the device exists and has a macaddr attribute
-            check_result = self.executor.execute(
-                f"uci get network.@device[{device_index}] 2>/dev/null",
-                check=False,
-                dry_run=dry_run
+            check_result = self.executor.run_command(
+                f"uci get network.@device[{device_index}] 2>/dev/null"
             )
 
-            if check_result.returncode != 0 and not dry_run:
+            if check_result[1] != 0 and not dry_run:
                 return self._set_wan_mac_alternative(mac, dry_run)
 
             # Standard approach
-            self.executor.execute(
-                f"uci set network.@device[{device_index}].macaddr={mac}",
-                dry_run=dry_run
-            )
+            if not dry_run:
+                self.executor.run_command(
+                    f"uci set network.@device[{device_index}].macaddr={mac}"
+                )
+            else:
+                self.logger.info(
+                    f"Would set device[{device_index}] MAC to {mac}")
             return True
         except Exception as e:
             self.logger.error(f"Failed to set WAN MAC address: {e}")
@@ -138,8 +93,10 @@ class NetworkConfigurator:
 
         # First try: Set MAC address for wan interface directly
         try:
-            self.executor.execute(
-                f"uci set network.wan.macaddr={mac}", dry_run=dry_run)
+            if not dry_run:
+                self.executor.run_command(f"uci set network.wan.macaddr={mac}")
+            else:
+                self.logger.info(f"Would set network.wan.macaddr to {mac}")
             self.logger.info(f"Set WAN MAC address directly to {mac}")
             return True
         except Exception as e:
@@ -147,16 +104,17 @@ class NetworkConfigurator:
 
         # Second try: Use physical interface if available
         try:
-            interfaces_result = self.executor.execute(
-                "ls -1 /sys/class/net/", check=False)
+            interfaces_result = self.executor.run_command(
+                "ls -1 /sys/class/net/")
             time.sleep(1)
-            if "eth0" in interfaces_result.stdout:
+            if "eth0" in interfaces_result[0]:
                 self.logger.info("Setting eth0 MAC address directly")
 
                 if not dry_run:
-                    self.executor.execute(f"ip link set eth0 down")
-                    self.executor.execute(f"ip link set eth0 address {mac}")
-                    self.executor.execute(f"ip link set eth0 up")
+                    self.executor.run_command(f"ip link set eth0 down")
+                    self.executor.run_command(
+                        f"ip link set eth0 address {mac}")
+                    self.executor.run_command(f"ip link set eth0 up")
                 else:
                     self.logger.info(f"Would set eth0 MAC to {mac}")
 
@@ -179,8 +137,13 @@ class NetworkConfigurator:
         try:
             mac = self.mac_generator.generate_unicast_mac()
             self.logger.info(f"Setting MAC clone address to: {mac}")
-            self.executor.execute(
-                f"uci set glconfig.general.macclone_addr={mac}", dry_run=dry_run)
+
+            if not dry_run:
+                self.executor.run_command(
+                    f"uci set glconfig.general.macclone_addr={mac}")
+            else:
+                self.logger.info(f"Would set macclone_addr to {mac}")
+
             time.sleep(1)
             return True
 
@@ -200,28 +163,28 @@ class NetworkConfigurator:
         try:
             # Get WAN MAC addresses
             for device_idx in self.get_network_devices():
-                result = self.executor.execute(
-                    f"uci get network.@device[{device_idx}].macaddr",
-                    check=False
+                result = self.executor.run_command(
+                    f"uci get network.@device[{device_idx}].macaddr"
                 )
-                if result.returncode == 0:
-                    addresses[f"wan_device_{device_idx}"] = result.stdout.strip(
-                    )
+                if result[1] == 0:
+                    addresses[f"wan_device_{device_idx}"] = result[0].strip()
 
             # Get MAC clone address
-            result = self.executor.execute(
-                "uci get glconfig.general.macclone_addr", check=False)
-            if result.returncode == 0:
-                addresses["macclone"] = result.stdout.strip()
+            result = self.executor.run_command(
+                "uci get glconfig.general.macclone_addr"
+            )
+            if result[1] == 0:
+                addresses["macclone"] = result[0].strip()
 
             # Get physical interface MAC addresses
             for iface in ["eth0", "eth1", "wlan0", "wlan1"]:
                 try:
-                    result = self.executor.execute(
-                        f"cat /sys/class/net/{iface}/address", check=False)
-                    if result.returncode == 0:
-                        addresses[iface] = result.stdout.strip()
-                except:
+                    result = self.executor.run_command(
+                        f"cat /sys/class/net/{iface}/address"
+                    )
+                    if result[1] == 0:
+                        addresses[iface] = result[0].strip()
+                except Exception:
                     pass
         except Exception as e:
             self.logger.warning(f"Error getting current MAC addresses: {e}")
@@ -240,10 +203,11 @@ class NetworkConfigurator:
         """
         try:
             # Commit network changes
-            self.executor.execute("uci commit network", dry_run=dry_run)
-
-            # Commit glconfig changes for MAC clone
-            self.executor.execute("uci commit glconfig", dry_run=dry_run)
+            if not dry_run:
+                self.executor.run_command("uci commit network")
+                self.executor.run_command("uci commit glconfig")
+            else:
+                self.logger.info("Would commit network and glconfig changes")
 
             self.logger.info("Changes committed successfully")
             return True
@@ -264,8 +228,11 @@ class NetworkConfigurator:
         """
         try:
             self.logger.info("Restarting network to apply changes")
-            self.executor.execute(
-                "/etc/init.d/network restart", dry_run=dry_run)
+            if not dry_run:
+                self.executor.run_command("/etc/init.d/network restart")
+            else:
+                self.logger.info("Would restart network service")
+
             time.sleep(2)
             return True
 

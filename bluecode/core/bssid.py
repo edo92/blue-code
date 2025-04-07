@@ -4,21 +4,20 @@ import sys
 import time
 import random
 import argparse
-from .cmd import Cmd
-from ..lib.logger import Logger
+from bluecode.utils.logger import Logger
+from bluecode.core.system import SystemCommand
 
 
-class BSSID:
-
+class BssidManager:
     """Class for managing BSSID randomization on wireless interfaces."""
 
     def __init__(self, verbose=False):
         """Initialize the BSSID manager with logging configuration."""
         # Set up logging
-        self.logger = Logger("BSSID", None, verbose)
+        self.logger = Logger("BssidManager", None, verbose)
 
-        # Initialize the Cmd class for command execution
-        self.cmd = Cmd(None, verbose=verbose)
+        # Initialize the SystemCommand class for command execution
+        self.cmd = SystemCommand(None, verbose=verbose)
 
     def generate_unicast_mac(self):
         """
@@ -57,7 +56,7 @@ class BSSID:
             self.logger.info(f"Would execute: {command}")
             return True, "Dry run"
 
-        # Use Cmd class to run shell commands
+        # Use SystemCommand class to run shell commands
         out, code = self.cmd.run_command(command)
 
         if code == 0:
@@ -160,7 +159,7 @@ def main():
     args = parser.parse_args()
 
     # Create BSSID manager
-    manager = BSSID(verbose=args.verbose)
+    manager = BssidManager(verbose=args.verbose)
 
     # Set BSSIDs for interfaces
     success, changes = manager.set_bssid_for_interfaces(

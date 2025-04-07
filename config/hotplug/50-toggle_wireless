@@ -1,7 +1,10 @@
 #!/bin/sh
 
+# Handle button press events to toggle wireless
+# This script is triggered by hotplug events
+
 action=$1
-logger -p notice -t wifi-toggle "Called... ${action}"
+logger -p notice -t wifi-toggle "Button event: ${action}"
 
 if [ "$BUTTON" = "BTN_0" ] || [ "$BUTTON" = "reset" ]; then
     if [ "$ACTION" = "pressed" ]; then
@@ -10,7 +13,7 @@ if [ "$BUTTON" = "BTN_0" ] || [ "$BUTTON" = "reset" ]; then
         wifi up
     else
         echo '{ "msg": "Disabling WiFi" }' >/dev/ttyS0
-        # Turn off WiFi when button is pressed
+        # Turn off WiFi when button is released
         wifi down
     fi
 fi

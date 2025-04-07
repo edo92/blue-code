@@ -5,6 +5,7 @@ from enum import Enum
 
 
 class LogLevel(Enum):
+    """Enumeration of log levels."""
     DEBUG = logging.DEBUG
     INFO = logging.INFO
     WARNING = logging.WARNING
@@ -18,12 +19,12 @@ class Logger:
     _instance = None
     _initialized = False
 
-    def __new__(cls, name='gl-inet-tool', log_file=None, level=logging.INFO):
+    def __new__(cls, name='bluecode', log_file=None, level=logging.INFO):
         if cls._instance is None:
             cls._instance = super(Logger, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, name='gl-inet-tool', log_file=None, level=logging.INFO):
+    def __init__(self, name='bluecode', log_file=None, level=logging.INFO):
         # Convert enum to int if needed
         if isinstance(level, LogLevel):
             level = level.value
@@ -53,16 +54,21 @@ class Logger:
             Logger._initialized = True
 
     def debug(self, message):
+        """Log a debug message."""
         self.logger.debug(message)
 
     def info(self, message):
+        """Log an info message."""
         self.logger.info(message)
 
     def warning(self, message):
+        """Log a warning message."""
         self.logger.warning(message)
 
     def error(self, message):
+        """Log an error message."""
         self.logger.error(message)
 
     def critical(self, message):
+        """Log a critical message."""
         self.logger.critical(message)
