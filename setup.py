@@ -1,22 +1,32 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="blue-code",
-    version="0.1",
+    name="bluecode-security",
+    version="0.2.0",
     packages=find_packages(),
     install_requires=[
-        "pyserial",
+        "pyserial>=3.5",
     ],
     entry_points={
         'console_scripts': [
-            'blue-code=src.cli:main',
+            'bluecode=bluecode.cli:main',
         ],
     },
     include_package_data=True,
     package_data={
-        'src': ['etc/*', 'usr/*'],
+        'bluecode': ['data/templates/*', 'data/scripts/*'],
     },
+    scripts=[
+        'scripts/bluecode-service',
+    ],
     python_requires='>=3.6',
     description="BlueCode Security Tools to enhance anonymity and reduce forensic traceability",
-    author="BlueCode",
+    author="GL-iNet",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: POSIX :: Linux",
+        "Topic :: Security",
+        "Topic :: System :: Networking",
+    ],
 )
