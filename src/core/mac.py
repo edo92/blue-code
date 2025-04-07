@@ -7,6 +7,7 @@ from .mac_gen import MacAddressGenerator
 
 
 class MacRandomizer:
+
     """Main class for MAC address randomization."""
 
     def __init__(self, executor):
@@ -14,7 +15,6 @@ class MacRandomizer:
         Initialize the MAC randomizer.
 
         Args:
-            logger (logging.Logger): Logger instance for output
             executor (CommandExecutor): Command executor instance
         """
         self.logger = Logger()
@@ -28,10 +28,7 @@ class MacRandomizer:
         Returns:
             bool: True if running as root, False otherwise
         """
-        if os.geteuid() != 0:
-            self.logger.error("This script must be run as root")
-            return False
-        return True
+        return os.geteuid() == 0
 
     def randomize_mac_addresses(self, interfaces, device_index=None, dry_run=False, no_restart=False):
         """
@@ -52,22 +49,22 @@ class MacRandomizer:
         for iface, mac in current_macs.items():
             self.logger.info(f"  {iface}: {mac}")
 
+        # Expand 'all' to include both interfaces
         if 'all' in interfaces:
             interfaces = ['wan', 'upstream']
 
         changes_made = False
 
-        # Randomize WAN MAC address if requested
+        # Randomize interfaces as requested
         if 'wan' in interfaces:
-            changes_made = self._handle_wan_randomization(
+            changes_made = self._randomize_wan_interface(
                 device_index, dry_run) or changes_made
 
-        # Randomize upstream MAC address if requested
         if 'upstream' in interfaces:
             if self.network.set_macclone_address(dry_run):
                 changes_made = True
 
-        # Commit changes if any were made
+        # Apply changes if needed
         if changes_made:
             if not self.network.commit_changes(dry_run):
                 self.logger.error("Failed to apply changes")
@@ -88,7 +85,7 @@ class MacRandomizer:
         self.logger.info("MAC address randomization complete")
         return True
 
-    def _handle_wan_randomization(self, device_index, dry_run):
+    def _randomize_wan_interface(self, device_index, dry_run):
         """
         Handle WAN MAC address randomization.
 
@@ -102,25 +99,21 @@ class MacRandomizer:
         if device_index is not None:
             # Use specified device index
             return self.network.set_wan_mac_address(device_index, dry_run)
-        else:
-            # Try all device indices
-            success = False
-            for device_idx in self.network.get_network_devices():
-                if self.network.set_wan_mac_address(device_idx, dry_run):
-                    success = True
-                    break
 
-            # If no device worked, try a direct approach
-            if not success:
-                self.logger.info("Trying direct MAC change approach")
-                # Generate a MAC address
-                mac = MacAddressGenerator.generate_unicast_mac()
-                try:
-                    # Try setting MAC for wan interface directly
-                    self.executor.execute(
-                        f"uci set network.wan.macaddr={mac}", dry_run=dry_run)
-                    return True
-                except Exception as e:
-                    self.logger.warning(f"Failed direct MAC set approach: {e}")
+        # Try each device index until one succeeds
+        for device_idx in self.network.get_network_devices():
+            if self.network.set_wan_mac_address(device_idx, dry_run):
+                return True
 
-            return success
+        # All devices failed, try direct approach
+        self.logger.info("Trying direct MAC change approach")
+        mac = MacAddressGenerator.generate_unicast_mac()
+
+        try:
+            self.executor.execute(
+                f"uci set network.wan.macaddr={mac}", dry_run=dry_run)
+            return True
+        except Exception as e:
+            self.logger.warning(f"Failed direct MAC set approach: {e}")
+
+        return False
