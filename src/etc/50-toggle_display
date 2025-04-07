@@ -5,11 +5,11 @@ logger -p notice -t wifi-toggle "Called... ${action}"
 
 if [ "$BUTTON" = "BTN_0" ] || [ "$BUTTON" = "reset" ]; then
     if [ "$ACTION" = "pressed" ]; then
-        echo '{ "msg":"Enabling WiFi" }' >/dev/ttyS0
+        echo '{ "msg": "Enabling WiFi" }' >/dev/ttyS0
         # Turn on WiFi when button is pressed
         wifi up
     else
-        echo '{ "msg":"Disabling WiFi" }' >/dev/ttyS0
+        echo '{ "msg": "Disabling WiFi" }' >/dev/ttyS0
         # Turn off WiFi when button is pressed
         wifi down
     fi

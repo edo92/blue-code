@@ -23,7 +23,7 @@ python3 ##SCRIPT_PATH## "$@"
 EOF
 
 # Replace the path placeholder with actual path
-sed -i "s|##SCRIPT_PATH##|$SCRIPT_DIR/simplified-script.py|g" "$SECURITY_SCRIPT"
+sed -i "s|##SCRIPT_PATH##|$SCRIPT_DIR/src/etc/security.py" "$SECURITY_SCRIPT"
 chmod +x "$SECURITY_SCRIPT"
 
 echo "Creating boot-time security init script at $INIT_SCRIPT..."
