@@ -3,10 +3,10 @@
 import os
 import re
 import tempfile
-from lib.logger import Logger
 
 
 class LogWiper:
+
     """
     Enhanced class for wiping MAC addresses from system logs with strong anti-forensic measures.
     Complete replacement for the original LogWiper with stronger security guarantees.
