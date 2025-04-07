@@ -13,5 +13,5 @@
 # pip3 install -e .
 
 ## Install security script
-chmod +x scripts/security.sh
-sh scripts/security.sh
+chmod +x src/etc/boot-security.sh
+sh src/etc/boot-security.sh
