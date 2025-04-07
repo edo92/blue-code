@@ -10,6 +10,8 @@ fi
 # Display usage instructions.
 usage() {
     echo "Usage: $0 [--no-switch]"
+    echo "Options:"
+    echo "  --no-switch  Skip installation of button switch script"
     exit 1
 }
 
@@ -32,6 +34,14 @@ log() {
 
 error() {
     echo "[ERROR] $*" >&2
+}
+
+# Create necessary directories
+create_directories() {
+    log "Creating essential directories..."
+    mkdir -p /etc/bluecode/templates
+    mkdir -p /usr/lib/bluecode
+    mkdir -p /etc/hotplug.d/button
 }
 
 # Install Python dependencies based on the environment.
@@ -71,34 +81,50 @@ setup_switch_button_script() {
 # Set up the boot script.
 setup_boot_script() {
     log "Setting up boot script..."
-    cp ./config/boot/boot.sh /etc/init.d/gl-mac-security
+    cp ./config/init.d/boot.template /etc/init.d/gl-mac-security
     chmod +x /etc/init.d/gl-mac-security
+
+    log "Boot script installed but not enabled."
+    log "To enable at startup, run: /etc/init.d/gl-mac-security enable"
+    log "To start now, run: /etc/init.d/gl-mac-security start"
 }
 
 # Set up the CLI command and backup any existing binary.
 setup_cli_command() {
-    log "Creating fallback symlink for blue-code command..."
-    if [ -f /usr/bin/blue-code ]; then
-        mv /usr/bin/blue-code /usr/bin/blue-code.pkg
+    log "Setting up executable links..."
+    if [ -f /usr/bin/bluecode ]; then
+        log "Backing up existing bluecode command..."
+        mv /usr/bin/bluecode /usr/bin/bluecode.backup
     fi
+
     log "Installing CLI command script..."
-    cp ./scripts/bluecode /usr/bin/blue-code
-    chmod +x /usr/bin/blue-code
+    cp ./scripts/bluecode /usr/bin/bluecode
+    chmod +x /usr/bin/bluecode
 }
 
-# Verify the installation by checking the blue-code command.
+# Verify the installation by checking the commands.
 verify_installation() {
     log "Verifying installation..."
-    if command -v blue-code >/dev/null 2>&1; then
-        log "✓ blue-code command is available"
+
+    if command -v bluecode >/dev/null 2>&1; then
+        log "✓ bluecode command is available"
     else
-        error "✗ blue-code command not found. Installation may have failed."
+        error "✗ bluecode command not found. Installation may have failed."
+        exit 1
+    fi
+
+    if [ -f /etc/init.d/gl-mac-security ]; then
+        log "✓ Boot-time security script is installed"
+    else
+        error "✗ Boot-time security script not found. Installation may have failed."
+        exit 1
     fi
 }
 
 # Main installation procedure.
 main() {
     log "Starting BlueCode Security Tools installation..."
+    create_directories
     install_python_dependencies
     install_python_package
     setup_switch_button_script
@@ -108,8 +134,15 @@ main() {
 
     echo ""
     log "Installation completed successfully!"
-    echo "Use 'blue-code' to run all randomizations."
-    echo "For help, use 'blue-code --help'"
+    echo ""
+    echo "Usage instructions:"
+    echo "- To run security randomization: bluecode [options]"
+    echo "- For help: bluecode --help"
+    echo "- To enable boot-time service: /etc/init.d/gl-mac-security enable"
+    echo "- To start boot-time service: /etc/init.d/gl-mac-security start"
+    echo ""
+    echo "IMPORTANT: IMEI randomization requires a manual reboot."
+    echo "Use 'bluecode --randomize imei --no-reboot-imei' for IMEI changes without automatic reboot."
 }
 
 main

@@ -42,7 +42,7 @@ start() {
 
     # Run MAC and BSSID randomization WITHOUT IMEI changes at boot
     # Use a specific set of randomizations that won't trigger a reboot
-    blue-code --randomize mac bssid logs --no-restart
+    bluecode --randomize mac bssid logs --no-restart
 
     echo "BlueCode security measures initialized"
 }
