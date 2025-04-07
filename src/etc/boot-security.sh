@@ -4,7 +4,7 @@
 # Sets up the init script to run at boot for MAC and BSSID protection
 
 INIT_SCRIPT="/etc/init.d/gl-mac-security"
-SECURITY_SCRIPT="/usr/bin/blue-code"
+CLI_SCRIPT="/usr/bin/blue-code"
 
 # Check if running as root
 if [ "$(id -u)" -ne 0 ]; then
@@ -17,15 +17,15 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 # Create the security script if blue-code isn't already in PATH
 if ! command -v blue-code >/dev/null 2>&1; then
-    echo "Creating security script at $SECURITY_SCRIPT..."
-    cat >"$SECURITY_SCRIPT" <<'EOF'
+    echo "Creating security script at $CLI_SCRIPT..."
+    cat >"$CLI_SCRIPT" <<'EOF'
 #!/bin/sh
 python3 ##SCRIPT_PATH## "$@"
 EOF
 
     # Replace the path placeholder with actual path
-    sed -i "s|##SCRIPT_PATH##|$SCRIPT_DIR/../cli.py" "$SECURITY_SCRIPT"
-    chmod +x "$SECURITY_SCRIPT"
+    sed -i "s|##SCRIPT_PATH##|$SCRIPT_DIR/../cli.py" "$CLI_SCRIPT"
+    chmod +x "$CLI_SCRIPT"
 else
     echo "blue-code command already exists in PATH"
 fi
