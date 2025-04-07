@@ -1,21 +1,50 @@
-# GL-iNet-v2
+# GL-iNet Privacy and Security Tools
 
-GL-iNet supports V2
+A collection of privacy and security enhancement tools for GL-iNet routers.
 
-## Startup
+## Features
 
-- Install app
+- MAC Address Randomization
+- BSSID Randomization
+- IMEI Randomization (for routers with cellular modems)
+- MAC address log wiping
 
-```sh
-opkg update
-chmod +x ./install.sh
+## Installation
+
+```bash
 ./install.sh
 ```
 
-### Install options
+## Usage
 
-- No switch button
+```bash
+# Randomize all identifiers
+gl-privacy --randomize all
 
-```sh
-./install.sh --no-switch
+# Only randomize MAC addresses
+gl-privacy --randomize mac
+
+# Dry run to see what would happen
+gl-privacy --randomize all --dry-run
+
+# With verbose output
+gl-privacy --randomize all --verbose
 ```
+
+## Options
+
+```
+  --dry-run             Simulate actions without making changes
+  --verbose, -v         Enable verbose logging
+  --interfaces WAN UPSTREAM [WAN UPSTREAM ...]
+                        Interfaces to randomize (default: wan upstream)
+  --no-restart          Do not restart network after changes
+  --device-index DEVICE_INDEX
+                        Specific device index to use for WAN interface
+  --randomize {mac,bssid,imei,logs,all} [{mac,bssid,imei,logs,all} ...]
+                        What to randomize (default: mac)
+```
+
+## License
+
+MIT
