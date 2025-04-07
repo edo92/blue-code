@@ -5,6 +5,7 @@ import re
 import time
 import string
 import random
+import subprocess
 from .cmd import Cmd
 from lib.logger import Logger
 
@@ -93,6 +94,7 @@ class ModemController:
         """
         self.logger.info("Enabling modem radio...")
         _, code = self.run_at_command("AT+CFUN=1")
+        time.sleep(2)
 
         if code != 0:
             self.logger.warning("Failed to enable radio.")
@@ -109,7 +111,8 @@ class ModemController:
             bool: True on success, False on failure
         """
         self.logger.info("Disabling modem radio...")
-        out, code = self.run_at_command("AT+CFUN=4")
+        _, code = self.run_at_command("AT+CFUN=4")
+        time.sleep(2)
 
         if code != 0:
             self.logger.warning("Failed to disable radio.")
@@ -387,11 +390,8 @@ class ModemController:
             self.logger.info("Rebooting device to apply IMEI changes...")
             try:
                 # Give some time for logs to be written
-                import time
                 time.sleep(2)
-
                 # Execute reboot command
-                import subprocess
                 subprocess.run(["/sbin/reboot"], check=False)
                 # This point may not be reached if reboot is quick
                 return True
