@@ -4,7 +4,7 @@
 # Sets up the init script to run at boot for MAC and BSSID protection
 
 INIT_SCRIPT="/etc/init.d/gl-mac-security"
-SECURITY_SCRIPT="/usr/bin/gl-secure"
+SECURITY_SCRIPT="/usr/bin/blue-code"
 
 # Check if running as root
 if [ "$(id -u)" -ne 0 ]; then
@@ -15,16 +15,20 @@ fi
 # Get the directory where this script is located
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
-# Create the security script
-echo "Creating security script at $SECURITY_SCRIPT..."
-cat >"$SECURITY_SCRIPT" <<'EOF'
+# Create the security script if blue-code isn't already in PATH
+if ! command -v blue-code >/dev/null 2>&1; then
+    echo "Creating security script at $SECURITY_SCRIPT..."
+    cat >"$SECURITY_SCRIPT" <<'EOF'
 #!/bin/sh
 python3 ##SCRIPT_PATH## "$@"
 EOF
 
-# Replace the path placeholder with actual path
-sed -i "s|##SCRIPT_PATH##|$SCRIPT_DIR/src/etc/security.py" "$SECURITY_SCRIPT"
-chmod +x "$SECURITY_SCRIPT"
+    # Replace the path placeholder with actual path
+    sed -i "s|##SCRIPT_PATH##|$SCRIPT_DIR/../cli.py" "$SECURITY_SCRIPT"
+    chmod +x "$SECURITY_SCRIPT"
+else
+    echo "blue-code command already exists in PATH"
+fi
 
 echo "Creating boot-time security init script at $INIT_SCRIPT..."
 
@@ -40,7 +44,7 @@ START=9
 STOP=99
 
 start() {
-    echo "Starting GL-iNet security measures..."
+    echo "Starting BlueCode security measures..."
     
     # Create tmpfs mount for client database
     tmpdir="$(mktemp -d)"
@@ -73,13 +77,13 @@ start() {
     rmdir "$tmpdir"
     
     # Run MAC and BSSID randomization
-    gl-secure
+    blue-code
     
-    echo "GL-iNet security measures initialized"
+    echo "BlueCode security measures initialized"
 }
 
 stop() {
-    echo "Shutting down GL-iNet security..."
+    echo "Shutting down BlueCode security..."
     
     # Secure cleanup on shutdown
     if [ -f /etc/oui-tertf/client.db ]; then
