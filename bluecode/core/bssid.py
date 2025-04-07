@@ -117,8 +117,6 @@ class BssidManager:
             bool: Success status
         """
         self.logger.info("Resetting WiFi to apply changes")
-        self.logger.info("Rebooting the device. Please wait...")
-
         success, message = self.run_uci_command("wifi", dry_run)
         time.sleep(1)
 
