@@ -3,8 +3,8 @@
 import os
 import re
 import time
-from cmd import Cmd
-from ..lib.logger import Logger
+from .cmd import Cmd
+from lib.logger import Logger
 
 
 class ModemController:
@@ -30,7 +30,7 @@ class ModemController:
         else:
             self.tty_device = self._find_available_tty()
 
-        self.cmd = Cmd(tty_device=self.tty_device, verbose=verbose)
+        self.cmd = Cmd(self.tty_device, verbose)
 
     def _find_available_tty(self):
         """Find the first available TTY device from the list."""

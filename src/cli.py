@@ -1,4 +1,5 @@
 import argparse
+import sys
 from core.bssid import BSSIDManager
 from core.imei_gen import ImeiGenerator
 from core.log_wiper import LogWiper
@@ -39,12 +40,12 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    logger = Logger(verbose=args.verbose)
+    logger = Logger()
     executor = CommandExecutor()
 
     # Initialize managers for different components
     mac_randomizer = MacRandomizer(executor)
-    bssid_manager = BSSIDManager(verbose=args.verbose)
+    bssid_manager = BSSIDManager()
 
     # Check if running as root for non-dry-run operations
     if not mac_randomizer.check_running_as_root() and not args.dry_run:
@@ -78,7 +79,7 @@ def main():
     # Process IMEI randomization if requested
     if 'imei' in args.randomize:
         logger.info("Randomizing IMEI...")
-        modem = ModemController(verbose=args.verbose)
+        modem = ModemController()
         # Generate a valid IMEI
         imei = ImeiGenerator.generate_random_imei()
 
@@ -97,3 +98,7 @@ def main():
         success = success and logs_success
 
     return 0 if success else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

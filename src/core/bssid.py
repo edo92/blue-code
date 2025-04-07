@@ -16,7 +16,7 @@ class BSSIDManager:
         self.logger = Logger("BSSID", None, verbose)
 
         # Initialize the Cmd class for command execution
-        self.cmd = Cmd(verbose=verbose)
+        self.cmd = Cmd(None, verbose=verbose)
 
     def generate_unicast_mac(self):
         """
