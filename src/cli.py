@@ -1,4 +1,3 @@
-
 import sys
 import argparse
 from core.bssid import BSSID
@@ -34,6 +33,9 @@ def parse_arguments():
     parser.add_argument('--randomize', nargs='+', default=['mac'],
                         choices=['mac', 'bssid', 'imei', 'logs', 'all'],
                         help='What to randomize (default: mac)')
+    # Secure option is now deprecated as enhanced security is always enabled
+    parser.add_argument('--secure', action='store_true',
+                        help=argparse.SUPPRESS)
 
     return parser.parse_args()
 
@@ -115,7 +117,7 @@ def process_imei_randomization(reboot_after=True):
 
 def process_log_wiping(logger, executor, dry_run):
     """
-    Process MAC address log wiping.
+    Process MAC address log wiping with enhanced security.
 
     Args:
         logger (Logger): Logger instance
@@ -125,9 +127,21 @@ def process_log_wiping(logger, executor, dry_run):
     Returns:
         bool: True if successful, False otherwise
     """
-    logger.info("Wiping MAC address logs...")
+
+    # Create wiper with enhanced security
     wiper = LogWiper(logger, executor)
-    return wiper.wipe_mac_logs(dry_run)
+
+    # Run comprehensive wiping
+    success = wiper.wipe_mac_logs(dry_run)
+
+    # Check boot-time security script
+    if success and not dry_run:
+        init_status = wiper.check_init_script()
+        if not init_status:
+            logger.warning(
+                "Boot-time security will not persist across reboots. Install script needs to be properly configured.")
+
+    return success
 
 
 def main():
@@ -172,7 +186,20 @@ def main():
         imei_success = process_imei_randomization(reboot_after=True)
         success = success and imei_success
 
-    # Wipe MAC address logs if requested
+    # Always verify boot-time security is in place
+    logger.info("Verifying boot-time security measures...")
+    wiper = LogWiper(logger, executor)
+    init_status = wiper.check_init_script()
+
+    if not init_status and not args.dry_run:
+        logger.error(
+            "SECURITY WARNING: Boot-time protection script not properly installed.")
+        logger.error(
+            "This is a critical security issue that must be fixed immediately.")
+        logger.error(
+            "Run the installation script to ensure proper security measures.")
+
+    # Use enhanced log wiping with anti-forensic measures if requested
     if 'logs' in args.randomize:
         logs_success = process_log_wiping(logger, executor, args.dry_run)
         success = success and logs_success
