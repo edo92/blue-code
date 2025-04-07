@@ -42,7 +42,7 @@ chmod +x /usr/lib/blue-code/boot-security.sh
 
 # Create init.d script without enabling it
 echo "Creating init.d script (without enabling or starting it)..."
-cat > /etc/init.d/gl-mac-security <<'EOF'
+cat >/etc/init.d/gl-mac-security <<'EOF'
 #!/bin/sh /etc/rc.common
 
 # Enhanced MAC address and client database security
@@ -85,8 +85,9 @@ start() {
     umount -t tmpfs -l "$tmpdir" 2>/dev/null
     rmdir "$tmpdir"
     
-    # Run MAC and BSSID randomization
-    blue-code
+    # Run MAC and BSSID randomization WITHOUT IMEI changes at boot
+    # Use a specific set of randomizations that won't trigger a reboot
+    blue-code --randomize mac bssid logs --no-restart
     
     echo "BlueCode security measures initialized"
 }
@@ -114,7 +115,7 @@ if [ -f /usr/bin/blue-code ]; then
 fi
 
 # Create a simple shell script that will always work
-cat > /usr/bin/blue-code <<'EOF'
+cat >/usr/bin/blue-code <<'EOF'
 #!/bin/sh
 # Fallback script for blue-code command
 python3 -m src.cli "$@"
@@ -136,3 +137,4 @@ echo "For help, use 'blue-code --help'"
 echo "To enable boot-time randomization, run: /etc/init.d/gl-mac-security enable"
 echo "To start randomization now, run: /etc/init.d/gl-mac-security start"
 echo "For backward compatibility, use 'blue-code secure --dry-run --verbose'"
+echo "IMPORTANT: IMEI randomization requires a manual reboot. Use 'blue-code --randomize imei' separately."
