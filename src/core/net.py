@@ -2,21 +2,21 @@
 
 import re
 import subprocess
+from lib.logger import Logger
 from .mac_gen import MacAddressGenerator
-from ..lib.logger import Logger
 
 
 class CommandExecutor:
     """Handle command execution with proper error handling."""
 
-    def __init__(self, logger):
+    def __init__(self):
         """
         Initialize the command executor.
 
         Args:
             logger (logging.Logger): Logger instance for output
         """
-        self.logger = logger
+        self.logger = Logger()
 
     def execute(self, command, dry_run=False, check=True, shell=True):
         """
@@ -62,7 +62,7 @@ class NetworkConfigurator:
     # Constants
     DEFAULT_INTERFACES = ["wan", "upstream"]
 
-    def __init__(self, logger, executor):
+    def __init__(self, executor):
         """
         Initialize the network configurator.
 

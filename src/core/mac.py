@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+from lib.logger import Logger
 from .net import NetworkConfigurator
+from .mac_gen import MacAddressGenerator
 
 
 class MacRandomizer:
     """Main class for MAC address randomization."""
 
-    def __init__(self, logger, executor):
+    def __init__(self, executor):
         """
         Initialize the MAC randomizer.
 
@@ -15,9 +17,9 @@ class MacRandomizer:
             logger (logging.Logger): Logger instance for output
             executor (CommandExecutor): Command executor instance
         """
-        self.logger = logger
+        self.logger = Logger()
         self.executor = executor
-        self.network = NetworkConfigurator(logger, executor)
+        self.network = NetworkConfigurator(executor)
 
     def check_running_as_root(self):
         """
