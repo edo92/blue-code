@@ -2,10 +2,20 @@
 
 GL-iNet supports V2
 
-## Install Commands
+## Startup
+
+- Install app
 
 ```sh
 opkg update
 chmod +x ./install.sh
 ./install.sh
+```
+
+### Install options
+
+- No switch button
+
+```sh
+./install.sh --no-switch
 ```

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Fallback script for blue-code command
+python3 -m src.cli "$@"

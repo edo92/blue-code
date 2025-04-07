@@ -18,5 +18,5 @@ setup(
     },
     python_requires='>=3.6',
     description="BlueCode Security Tools to enhance anonymity and reduce forensic traceability",
-    author="GL-iNet",
+    author="BlueCode",
 )
