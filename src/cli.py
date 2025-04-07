@@ -1,12 +1,14 @@
+#!/usr/bin/env python3
+
 import sys
 import argparse
-from core.bssid import BSSID
-from core.imei_gen import ImeiGenerator
-from core.log_wiper import LogWiper
-from core.mac import MacRandomizer
-from core.modem import ModemController
-from core.net import CommandExecutor, NetworkConfigurator
-from lib.logger import Logger, LogLevel
+from src.lib.logger import Logger, LogLevel
+from src.core.net import CommandExecutor, NetworkConfigurator
+from src.core.modem import ModemController
+from src.core.mac import MacRandomizer
+from src.core.log_wiper import LogWiper
+from src.core.imei_gen import ImeiGenerator
+from src.core.bssid import BSSID
 
 
 def parse_arguments():
@@ -17,8 +19,33 @@ def parse_arguments():
         argparse.Namespace: Parsed arguments
     """
     parser = argparse.ArgumentParser(
-        description='Randomize network identifiers for GL-iNet devices'
+        description='BlueCode Security Tools for network identifier randomization'
     )
+
+    # Command handling
+    subparsers = parser.add_subparsers(dest='command', help='Commands')
+
+    # Default behavior - run all randomizations
+
+    # 'secure' subcommand for backward compatibility
+    secure_parser = subparsers.add_parser(
+        'secure', help='Run with options (for backward compatibility)')
+    secure_parser.add_argument('--dry-run', action='store_true',
+                               help='Simulate actions without making changes')
+    secure_parser.add_argument('--verbose', '-v', action='store_true',
+                               help='Enable verbose logging')
+    secure_parser.add_argument('--interfaces', nargs='+', default=NetworkConfigurator.DEFAULT_INTERFACES,
+                               choices=['wan', 'upstream', 'all'],
+                               help='Interfaces to randomize (default: wan upstream)')
+    secure_parser.add_argument('--no-restart', action='store_true',
+                               help='Do not restart network after changes')
+    secure_parser.add_argument('--device-index', type=int, default=None,
+                               help='Specific device index to use for WAN interface')
+    secure_parser.add_argument('--randomize', nargs='+', default=['mac'],
+                               choices=['mac', 'bssid', 'imei', 'logs', 'all'],
+                               help='What to randomize (default: mac)')
+
+    # Global arguments for default mode
     parser.add_argument('--dry-run', action='store_true',
                         help='Simulate actions without making changes')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -30,12 +57,9 @@ def parse_arguments():
                         help='Do not restart network after changes')
     parser.add_argument('--device-index', type=int, default=None,
                         help='Specific device index to use for WAN interface')
-    parser.add_argument('--randomize', nargs='+', default=['mac'],
+    parser.add_argument('--randomize', nargs='+', default=['all'],
                         choices=['mac', 'bssid', 'imei', 'logs', 'all'],
-                        help='What to randomize (default: mac)')
-    # Secure option is now deprecated as enhanced security is always enabled
-    parser.add_argument('--secure', action='store_true',
-                        help=argparse.SUPPRESS)
+                        help='What to randomize (default: all)')
 
     return parser.parse_args()
 
@@ -127,7 +151,6 @@ def process_log_wiping(logger, executor, dry_run):
     Returns:
         bool: True if successful, False otherwise
     """
-
     # Create wiper with enhanced security
     wiper = LogWiper(logger, executor)
 
