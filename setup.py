@@ -14,7 +14,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "gl-privacy=src.cli:main",
+            "bluecode=src.cli:main",
         ],
     },
     classifiers=[
