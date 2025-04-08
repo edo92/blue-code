@@ -15,6 +15,9 @@ This project was inspired by and developed with guidance from the [Blue-Merle](h
 First, transfer the project to your GL-iNet router:
 
 ```bash
+# Clone repository
+git clone https://github.com/edo92/blue-code
+
 # Copy project into GL-iNet device
 scp -O -r blue-code root@192.168.8.1:/tmp
 ```
