@@ -6,6 +6,15 @@ BlueCode Security Tools is a comprehensive Python-based toolkit designed to enha
 
 ## Installation
 
+#### Copying the Project to Your GL-iNet Device
+
+First, transfer the project to your GL-iNet router:
+
+```bash
+# Copy project into GL-iNet device
+scp -O -r blue-code root@192.168.8.1:/tmp
+```
+
 ### Getting Started
 
 The toolkit is installed using the `install.sh` script:
@@ -13,6 +22,9 @@ The toolkit is installed using the `install.sh` script:
 ```bash
 # Update package lists
 opkg update
+
+# Navigation to blue-code project
+cd /etc/blue-code
 
 # Make the install script executable
 chmod +x ./install.sh
