@@ -24,6 +24,12 @@ scp -O -r blue-code root@192.168.8.1:/tmp
 
 ### Getting Started
 
+SSH into GL-iNet device
+
+```sh
+ssh root@192.168.8.1
+```
+
 The toolkit is installed using the `install.sh` script:
 
 ```bash
@@ -31,7 +37,7 @@ The toolkit is installed using the `install.sh` script:
 opkg update
 
 # Navigation to blue-code project
-cd /etc/blue-code
+cd /tmp/blue-code
 
 # Make the install script executable
 chmod +x ./install.sh
