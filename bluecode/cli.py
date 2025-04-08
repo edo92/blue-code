@@ -9,6 +9,7 @@ from bluecode.core.mac import MacManager
 from bluecode.core.logs import LogManager
 from bluecode.core.modem import ModemManager
 from bluecode.core.bssid import BssidManager
+from bluecode.core.sim import SimManager
 from bluecode.utils.generators import ImeiGenerator
 
 
@@ -44,6 +45,15 @@ def parse_arguments():
                                choices=['mac', 'bssid', 'imei', 'logs', 'all'],
                                help='What to randomize (default: mac)')
 
+    # 'info' subcommand for retrieving information
+    info_parser = subparsers.add_parser(
+        'info', help='Display current network identifiers')
+    info_parser.add_argument('types', nargs='*', default=['all'],
+                             choices=['mac', 'bssid', 'imei', 'all'],
+                             help='Types of information to display (default: all)')
+    info_parser.add_argument('--verbose', '-v', action='store_true',
+                             help='Enable verbose logging')
+
     # Global arguments for default mode
     parser.add_argument('--dry-run', action='store_true',
                         help='Simulate actions without making changes')
@@ -61,6 +71,9 @@ def parse_arguments():
                         help='What to randomize (default: all)')
     parser.add_argument('--no-reboot-imei', action='store_true',
                         help='Do not reboot after IMEI randomization')
+    parser.add_argument('--info', nargs='*', default=None,
+                        choices=['mac', 'bssid', 'imei', 'all'],
+                        help='Display current network identifiers')
 
     return parser.parse_args()
 
@@ -172,15 +185,180 @@ def process_log_wiping(logger, executor, dry_run):
     return success
 
 
+def get_current_bssid_info(verbose=False):
+    """
+    Get current BSSID information.
+
+    Args:
+        verbose (bool): If True, enable verbose logging
+
+    Returns:
+        dict: Dictionary with BSSID information
+    """
+    logger = Logger()
+    if verbose:
+        logger.logger.setLevel(LogLevel.DEBUG)
+    executor = SystemCommand(verbose=verbose)
+
+    bssid_info = {}
+
+    # Get BSSID information using UCI commands
+    try:
+        # Try to get information for wifi interfaces
+        for idx in range(4):  # Check interfaces 0-3
+            cmd = f"uci -q get wireless.@wifi-iface[{idx}].macaddr"
+            output, code = executor.run_command(cmd)
+
+            if code == 0 and output.strip():
+                iface_type_cmd = f"uci -q get wireless.@wifi-iface[{idx}].mode"
+                iface_type, _ = executor.run_command(iface_type_cmd)
+                iface_type = iface_type.strip() if iface_type else "unknown"
+
+                # Get the device name if available
+                dev_cmd = f"uci -q get wireless.@wifi-iface[{idx}].device"
+                dev, _ = executor.run_command(dev_cmd)
+                dev = dev.strip() if dev else f"wifi{idx}"
+
+                key = f"wlan{idx} ({iface_type} mode on {dev})"
+                bssid_info[key] = output.strip()
+    except Exception as e:
+        logger.error(f"Error getting BSSID information: {e}")
+
+    return bssid_info
+
+
+def get_current_mac_info():
+    """
+    Get current MAC address information.
+
+    Returns:
+        dict: Dictionary with MAC address information
+    """
+    executor = SystemCommand()
+    network_manager = NetworkManager(executor)
+
+    # Use existing method to get current MAC addresses
+    return network_manager.get_current_mac_addresses()
+
+
+def get_current_imei_info(verbose=False):
+    """
+    Get current IMEI information.
+
+    Args:
+        verbose (bool): If True, enable verbose logging
+
+    Returns:
+        dict: Dictionary with IMEI information
+    """
+    logger = Logger()
+    modem = ModemManager(verbose=verbose)
+    sim_manager = SimManager(modem, verbose=verbose)
+
+    imei_info = {}
+
+    try:
+        # Get IMEI from modem
+        imei = modem.get_imei()
+        if imei:
+            imei_info["Current IMEI"] = imei
+
+            # Check if IMEI is valid
+            is_valid = ImeiGenerator.validate_imei(imei)
+            imei_info["IMEI Validity"] = "Valid" if is_valid else "Invalid format"
+
+            # Get additional information
+            sim_info = sim_manager.fetch_sim_info()
+            if sim_info.get("imsi"):
+                imei_info["IMSI"] = sim_info["imsi"]
+            if sim_info.get("iccid"):
+                imei_info["ICCID"] = sim_info["iccid"]
+
+            # Detect SIM type
+            sim_type = sim_manager.detect_sim_type()
+            if sim_type and sim_type != "unknown":
+                imei_info["SIM Type"] = sim_type
+    except Exception as e:
+        logger.error(f"Error getting IMEI information: {e}")
+        imei_info["Error"] = str(e)
+
+    return imei_info
+
+
+def display_info(info_types, verbose=False):
+    """
+    Display current network identifiers.
+
+    Args:
+        info_types (list): Types of information to display
+        verbose (bool): If True, enable verbose logging
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    logger = Logger()
+    logger.info("Retrieving current network information...")
+
+    if 'all' in info_types:
+        info_types = ['mac', 'bssid', 'imei']
+
+    success = True
+
+    # Get and display requested information
+    for info_type in info_types:
+        logger.info(f"\n=== {info_type.upper()} Information ===")
+
+        if info_type == 'mac':
+            mac_info = get_current_mac_info()
+            if mac_info:
+                for interface, mac in mac_info.items():
+                    logger.info(f"{interface}: {mac}")
+            else:
+                logger.warning("No MAC address information available")
+                success = False
+
+        elif info_type == 'bssid':
+            bssid_info = get_current_bssid_info(verbose)
+            if bssid_info:
+                for interface, bssid in bssid_info.items():
+                    logger.info(f"{interface}: {bssid}")
+            else:
+                logger.warning("No BSSID information available")
+                success = False
+
+        elif info_type == 'imei':
+            imei_info = get_current_imei_info(verbose)
+            if imei_info:
+                for key, value in imei_info.items():
+                    logger.info(f"{key}: {value}")
+            else:
+                logger.warning("No IMEI information available")
+                success = False
+
+    return success
+
+
 def main():
     """Main function to handle randomization operations."""
     args = parse_arguments()
 
-    # Initialize required components
+    # Initialize logger
     logger = Logger()
     if args.verbose:
         logger.logger.setLevel(LogLevel.DEBUG)
 
+    # Handle info command if specified as a subcommand
+    if args.command == 'info':
+        return 0 if display_info(args.types, args.verbose) else 1
+
+    # Handle --info option for backwards compatibility
+    if args.info is not None:
+        info_types = args.info
+        if not info_types:  # If --info with no arguments
+            info_types = ['all']
+        return 0 if display_info(info_types, args.verbose) else 1
+
+    # Initialize components needed for randomization operations
     executor = SystemCommand()
     mac_manager = MacManager(executor)
     bssid_manager = BssidManager(verbose=args.verbose)
