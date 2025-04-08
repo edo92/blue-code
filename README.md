@@ -229,3 +229,7 @@ The log management system implements several anti-forensic techniques:
 - Log file sanitization to remove MAC addresses
 - System buffer clearing
 - File system journal flushing
+
+## Todo
+
+1. Package the project along with all required libraries to enable offline installation
