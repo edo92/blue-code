@@ -1,19 +1,67 @@
 #!/bin/sh
 
-# Handle button press events to toggle wireless
+# Handle button press events to selectively toggle wireless
 # This script is triggered by hotplug events
+# Modified to keep WAN/client connections active while toggling local AP
 
 action=$1
 logger -p notice -t wifi-toggle "Button event: ${action}"
 
 if [ "$BUTTON" = "BTN_0" ] || [ "$BUTTON" = "reset" ]; then
     if [ "$ACTION" = "pressed" ]; then
-        echo '{ "msg": "Enabling WiFi" }' >/dev/ttyS0
-        # Turn on WiFi when button is pressed
-        wifi up
+        echo '{ "msg": "Enabling WiFi access point" }' >/dev/ttyS0
+        logger -p notice -t wifi-toggle "Enabling WiFi access point"
+
+        # Enable AP interfaces (typically index 0 and 1 are AP interfaces)
+        uci set wireless.@wifi-iface[0].disabled=0
+        uci set wireless.@wifi-iface[1].disabled=0 2>/dev/null
+
+        # Ensure client/upstream interfaces remain enabled
+        client_iface_count=$(uci show wireless | grep -c "@wifi-iface\[")
+        if [ "$client_iface_count" -gt 2 ]; then
+            # Process client interfaces (2+)
+            i=2
+            while [ $i -lt "$client_iface_count" ]; do
+                # Get the mode of this interface
+                mode=$(uci -q get wireless.@wifi-iface[$i].mode)
+                # Only keep sta (station/client) mode interfaces enabled
+                if [ "$mode" = "sta" ]; then
+                    uci set wireless.@wifi-iface[$i].disabled=0
+                fi
+                i=$((i + 1))
+            done
+        fi
+
+        # Apply changes
+        uci commit wireless
+        wifi
     else
-        echo '{ "msg": "Disabling WiFi" }' >/dev/ttyS0
-        # Turn off WiFi when button is released
-        wifi down
+        # Button released - disable AP but keep WAN active
+        echo '{ "msg": "Disabling WiFi access point" }' >/dev/ttyS0
+        logger -p notice -t wifi-toggle "Disabling WiFi access point"
+
+        # Disable only AP interfaces (typically index 0 and 1)
+        uci set wireless.@wifi-iface[0].disabled=1
+        uci set wireless.@wifi-iface[1].disabled=1 2>/dev/null
+
+        # Ensure client/upstream interfaces remain enabled
+        client_iface_count=$(uci show wireless | grep -c "@wifi-iface\[")
+        if [ "$client_iface_count" -gt 2 ]; then
+            # Process client interfaces (2+)
+            i=2
+            while [ $i -lt "$client_iface_count" ]; do
+                # Get the mode of this interface
+                mode=$(uci -q get wireless.@wifi-iface[$i].mode)
+                # Only keep sta (station/client) mode interfaces enabled
+                if [ "$mode" = "sta" ]; then
+                    uci set wireless.@wifi-iface[$i].disabled=0
+                fi
+                i=$((i + 1))
+            done
+        fi
+
+        # Apply changes
+        uci commit wireless
+        wifi
     fi
 fi
