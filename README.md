@@ -1,4 +1,4 @@
-# BlueCode Security Tools Documentation
+# BlueCode
 
 # Overview
 
