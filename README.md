@@ -10,7 +10,29 @@ This project was inspired by and developed with guidance from the [Blue-Merle](h
 
 ## Installation
 
-#### Copying the Project to Your GL-iNet Device
+#### Offline install
+
+Bundle package
+
+```sh
+chmod +x ./bundle.sh
+sh ./bundle.sh
+```
+
+Transfer bundled file `bluecode-offline.tar.gz`
+
+```sh
+scp -O -r bluecode-offline.tar.gz root@192.168.8.1:/tmp
+```
+
+Install
+
+```sh
+chmod +x ./install-offline.sh
+./install-offline.sh
+```
+
+### Getting Started
 
 First, transfer the project to your GL-iNet router:
 
@@ -22,7 +44,7 @@ git clone https://github.com/edo92/blue-code
 scp -O -r blue-code root@192.168.8.1:/tmp
 ```
 
-### Getting Started
+---
 
 SSH into GL-iNet device
 
