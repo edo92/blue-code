@@ -2,7 +2,7 @@
 
 # Overview
 
-BlueCode Security Tools is a comprehensive Python-based toolkit designed to enhance anonymity and reduce forensic traceability on GL-iNet router devices, including support for GL-iNet Mudi v2. The toolkit focuses on randomizing various network identifiers and implementing anti-forensic measures to protect user privacy.
+BlueCode Security Tools is a comprehensive Python-based toolkit designed to enhance anonymity and reduce forensic traceability on [GL-iNet Mudi v1](https://www.gl-inet.com/products/gl-e750/?utm_source=website&utm_medium=menubar) device. GL-iNet Mudi v2 not all features are supported. The toolkit focuses on randomizing various network identifiers and implementing anti-forensic measures to protect user privacy.
 
 ## Acknowledgments
 
